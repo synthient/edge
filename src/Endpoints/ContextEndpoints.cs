@@ -37,9 +37,13 @@ public static class ContextEndpoints
         if (bucketResults.Count == 0)
             return TypedResults.NotFound();
 
+        var (network, location) = mmDbReader.LookupNetworkAndLocation(ipAddress);
+
         var response = new ContextIpResponse
         {
             Ip = ip,
+            Network = network,
+            Location = location,
             Enriched = bucketResults
         };
 
