@@ -1,7 +1,8 @@
 ﻿using System.Net;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Synthient.Edge.Models;
 using Synthient.Edge.Models.Config;
+using Synthient.Edge.Services;
 using Synthient.Edge.Utilities;
 
 namespace Synthient.Edge.Endpoints;
@@ -10,25 +11,54 @@ public static class ContextEndpoints
 {
     public static RouteGroupBuilder MapContextEndpoints(this WebApplication app, AppConfig appConfig)
     {
-        var context = app.MapGroup("/context");
+        var group = app.MapGroup("/context");
 
-        // Enable API key filter if keys are configured.
+        // Add API key filter if keys are configured.
         if (appConfig.ApiKeys.Count > 0)
-            context.AddEndpointFilter<ApiKeyFilter>();
+            group.AddEndpointFilter<ApiKeyFilter>();
 
-        context.MapGet("/{ip}", LookupIpAsync);
+        group.MapGet("/{ip}", LookupIpAsync);
+        group.MapGet("/{ip}/buckets/{bucket}", LookupBucketAsync);
 
-        return context;
+        return group;
     }
 
-    private static Results<Ok, NotFound, BadRequest> LookupIpAsync(
+    private static async Task<IResult> LookupIpAsync(
         [FromRoute] string ip,
+        [FromServices] IEventRepository repo,
+        [FromServices] MmDbReader mmDbReader,
         CancellationToken cancellationToken
     )
     {
         if (!IPAddress.TryParse(ip, out var ipAddress))
-            return TypedResults.BadRequest();
+            return TypedResults.BadRequest($"'{ip}' is not a valid IP address.");
 
-        return TypedResults.Ok();
+        var bucketResults = await repo.GetAllBucketsAsync(ipAddress, cancellationToken);
+        if (bucketResults.Count == 0)
+            return TypedResults.NotFound();
+
+        var response = new ContextIpResponse
+        {
+            Ip = ip,
+            Enriched = bucketResults
+        };
+
+        return TypedResults.Ok(response);
+    }
+
+    private static async Task<IResult> LookupBucketAsync(
+        string ip,
+        string bucket,
+        [FromServices] IEventRepository repo,
+        CancellationToken ct)
+    {
+        if (!IPAddress.TryParse(ip, out var ipAddress))
+            return TypedResults.BadRequest($"'{ip}' is not a valid IP address.");
+
+        var result = await repo.GetBucketAsync(ipAddress, bucket, ct);
+        if (result is null)
+            return TypedResults.NotFound();
+
+        return TypedResults.Ok(result);
     }
 }
