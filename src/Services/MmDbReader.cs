@@ -1,11 +1,12 @@
 ﻿using System.Net;
+using MaxMind.Db;
 using Synthient.Edge.Models.Config;
 
 namespace Synthient.Edge.Services;
 
 public class MmDbReader(AppConfig appConfig, ILogger<MmDbReader> logger) : IDisposable
 {
-    private readonly MaxMind.Db.Reader _mmDbReader = new(appConfig.Mmdb.Path);
+    private readonly Reader _mmDbReader = new(appConfig.Mmdb.Path);
 
     public MmdbData Lookup(IPAddress ipAddress)
     {
