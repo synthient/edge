@@ -4,7 +4,7 @@ using YamlDotNet.Serialization;
 
 namespace Synthient.Edge.Models.Config.Definitions;
 
-public class FilterDefinition : IConfigDefinition<FilterConfig>
+public class FilterDefinition : IKeyedConfigDefinition<FilterConfig>
 {
     private const string MmdbPrefix = "mmdb.";
 
@@ -17,26 +17,26 @@ public class FilterDefinition : IConfigDefinition<FilterConfig>
 
     public List<string> Provider { get; set; } = [];
 
-    public FilterConfig Build()
+    public FilterConfig Build(string filterName)
     {
         foreach (var key in MmdbFilters.Keys)
-            ValidateMmdbKey(key);
+            ValidateMmdbKey(filterName, key);
 
         return new FilterConfig
-        {
-            Providers = Provider.ToFrozenSet(StringComparer.OrdinalIgnoreCase),
-            MmdbFilters = MmdbFilters.ToFrozenDictionary(
+        (
+            providers: Provider.ToFrozenSet(StringComparer.OrdinalIgnoreCase),
+            mmdbFilters: MmdbFilters.ToFrozenDictionary(
                 kv => kv.Key,
                 kv => kv.Value.ToFrozenSet(StringComparer.OrdinalIgnoreCase)
             )
-        };
+        );
     }
 
-    private static void ValidateMmdbKey(string key)
+    private static void ValidateMmdbKey(string filterName, string key)
     {
         if (!key.StartsWith(MmdbPrefix, StringComparison.OrdinalIgnoreCase))
             throw new ConfigValidationException(
-                $"filters.{key}",
+                $"filters.{filterName}.{key}",
                 $"Only custom '{MmdbPrefix}*' keys are supported (e.g. '{MmdbPrefix}country.iso_code')."
             );
     }

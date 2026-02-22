@@ -24,7 +24,7 @@ public class AppConfigDefinition : IConfigDefinition<AppConfig>
             Source = Source.Build(),
             Sink = Sink.Build(),
             Mmdb = Mmdb.Build(),
-            Filters = Filters.ToDictionary(kv => kv.Key, kv => kv.Value.Build())
+            Filters = Filters.ToDictionary(kv => kv.Key, kv => kv.Value.Build(kv.Key))
         };
     }
 }

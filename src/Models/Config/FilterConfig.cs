@@ -1,29 +1,34 @@
 ﻿using System.Collections.Frozen;
+using Synthient.Edge.Utilities;
 
 namespace Synthient.Edge.Models.Config;
 
 using MmdbData = Dictionary<string, object>;
 
-public class FilterConfig
+public class FilterConfig(
+    FrozenSet<string> providers,
+    FrozenDictionary<string, FrozenSet<string>> mmdbFilters
+)
 {
     private const string MmdbPrefix = "mmdb.";
+    private readonly Func<ProxyEvent, MmdbData?, bool> _predicate = Compile(providers, mmdbFilters);
 
-    public required FrozenSet<string> Providers { get; init; }
-    public required FrozenDictionary<string, FrozenSet<string>> MmdbFilters { get; init; }
+    public bool Matches(ProxyEvent evt, MmdbData? mmdb) => _predicate(evt, mmdb);
 
-    public Func<ProxyEvent, MmdbData?, bool> Compile()
+    private static Func<ProxyEvent, MmdbData?, bool> Compile(
+        FrozenSet<string>? providers,
+        FrozenDictionary<string, FrozenSet<string>>? mmdbFilters)
     {
         Func<ProxyEvent, MmdbData?, bool>? combined = null;
 
-        if (Providers is { Count: > 0 })
+        if (providers is { Count: > 0 })
         {
-            var providers = Providers;
             combined = (evt, _) => providers.Contains(evt.Provider);
         }
 
-        if (MmdbFilters is { Count: > 0 })
+        if (mmdbFilters is { Count: > 0 })
         {
-            foreach (var (key, expectedValues) in MmdbFilters)
+            foreach (var (key, expectedValues) in mmdbFilters)
             {
                 var segments = key[MmdbPrefix.Length..].Split('.');
                 var lookup = BuildMmdbLookup(segments);
@@ -34,19 +39,12 @@ public class FilterConfig
                     && lookup(mmdb) is { } actual
                     && MmdbValueMatches(actual, expected);
 
-                combined = combined is null
-                    ? mmdbPredicate
-                    : And(combined, mmdbPredicate);
+                combined = combined is null ? mmdbPredicate : FilterPredicates.And(combined, mmdbPredicate);
             }
         }
 
-        return combined ?? (static (_, _) => true);
+        return combined ?? FilterPredicates.Pass();
     }
-
-    private static Func<ProxyEvent, MmdbData?, bool> And(
-        Func<ProxyEvent, MmdbData?, bool> left,
-        Func<ProxyEvent, MmdbData?, bool> right) =>
-        (evt, mmdb) => left(evt, mmdb) && right(evt, mmdb);
 
     private static bool MmdbValueMatches(object actual, FrozenSet<string> expected) =>
         actual is string s
