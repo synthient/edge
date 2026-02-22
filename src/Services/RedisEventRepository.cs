@@ -16,6 +16,7 @@ public sealed partial class RedisEventRepository(
 {
     private readonly IDatabase _db = connection.GetDatabase(appConfig.Sink.Database);
 
+    // TODO: Map IP to buckets with a set (instead of hash, we are not using the timestamp).
     private static readonly LuaScript InsertScript = LuaScript.Prepare("""
                                                                        local current = redis.call('HGET', @bucketKey, @providerId)
                                                                        local count   = 1
@@ -61,7 +62,8 @@ public sealed partial class RedisEventRepository(
             var ipKey = RedisKeyBuilder.IpKey(bucketedEvt.Event.IpAddress);
             var bucketKey = RedisKeyBuilder.BucketKey(bucketedEvt.Event.IpAddress, bucketId);
 
-            _ = _db.ScriptEvaluateAsync(
+            // TODO: Swallows errors.
+            _ = await _db.ScriptEvaluateAsync(
                 InsertScript,
                 new
                 {
