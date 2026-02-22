@@ -8,11 +8,13 @@ public class AppConfigDefinition : IConfigDefinition<AppConfig>
     public List<string> ApiKeys { get; set; } = [];
     public RedisSourceDefinition? Source { get; set; }
     public RedisSinkDefinition? Sink { get; set; }
+    public MmDbDefinition? MmDb { get; set; }
 
     public AppConfig Build()
     {
         ConfigValidationException.ThrowIfNull("source", Source);
         ConfigValidationException.ThrowIfNull("sink", Sink);
+        ConfigValidationException.ThrowIfNull("mmdb", MmDb);
 
         return new AppConfig
         {
