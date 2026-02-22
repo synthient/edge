@@ -7,7 +7,7 @@ using Synthient.Edge.Services;
 
 namespace Synthient.Edge.Pipeline;
 
-public sealed class RedisPubSubSource(
+public sealed partial class RedisPubSubSource(
     AppConfig appConfig,
     ChannelWriter<ProxyEvent> output,
     MetricsReporter metrics,
@@ -39,13 +39,13 @@ public sealed class RedisPubSubSource(
                 }
                 catch (RedisException ex)
                 {
-                    logger.LogError(ex, "Redis connection failed. Reconnecting in {Backoff:g}.", backoff);
+                    LogConnectionFailed(logger, ex, backoff);
                     await Task.Delay(backoff, stoppingToken);
                     backoff = backoff * 2 < MaxBackoff ? backoff * 2 : MaxBackoff;
                 }
                 catch (Exception ex)
                 {
-                    logger.LogCritical(ex, "Unexpected error in Redis source. The pipeline may be degraded.");
+                    LogUnexpectedError(logger, ex);
                     await Task.Delay(backoff, stoppingToken);
                 }
             }
@@ -53,13 +53,13 @@ public sealed class RedisPubSubSource(
         finally
         {
             output.Complete();
-            logger.LogInformation("Redis source stopped.");
+            LogSourceStopped(logger);
         }
     }
 
     private async Task ConnectAndSubscribeAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Connecting to Redis source ({Endpoint})", appConfig.Source.Endpoint);
+        LogConnecting(logger, appConfig.Source.Endpoint);
         await using var connection = await ConnectionMultiplexer.ConnectAsync(_redisOptions);
 
         var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -68,7 +68,7 @@ public sealed class RedisPubSubSource(
         var subscriber = connection.GetSubscriber();
 
         await subscriber.SubscribeAsync(_channel, (_, message) => OnMessage(message));
-        logger.LogInformation("Subscribed to channel '{Channel}'.", _channel);
+        LogSubscribed(logger, _channel);
 
         await using var _ = cancellationToken.Register(() => disconnected.TrySetResult());
         await disconnected.Task;
@@ -80,7 +80,7 @@ public sealed class RedisPubSubSource(
 
         if (!ProxyEventSerializer.TryDeserialize(message, out var evt))
         {
-            logger.LogWarning("Failed to deserialize message: {Message}.", (string?)message);
+            LogFailedDeserialization(logger, message);
             return;
         }
 
@@ -99,4 +99,22 @@ public sealed class RedisPubSubSource(
         ReconnectRetryPolicy = new ExponentialRetry(deltaBackOffMilliseconds: 1000),
         ConnectRetry = 5
     };
+
+    [LoggerMessage(LogLevel.Error, "Redis connection failed. Reconnecting in {backoff:g}.")]
+    static partial void LogConnectionFailed(ILogger<RedisPubSubSource> logger, Exception ex, TimeSpan backoff);
+
+    [LoggerMessage(LogLevel.Critical, "Unexpected error in Redis source. The pipeline may be degraded.")]
+    static partial void LogUnexpectedError(ILogger<RedisPubSubSource> logger, Exception ex);
+
+    [LoggerMessage(LogLevel.Information, "Redis source stopped.")]
+    static partial void LogSourceStopped(ILogger<RedisPubSubSource> logger);
+
+    [LoggerMessage(LogLevel.Information, "Connecting to Redis source ({endpoint})")]
+    static partial void LogConnecting(ILogger<RedisPubSubSource> logger, string endpoint);
+
+    [LoggerMessage(LogLevel.Information, "Subscribed to Redis channel '{channel}'.")]
+    static partial void LogSubscribed(ILogger<RedisPubSubSource> logger, RedisChannel channel);
+
+    [LoggerMessage(LogLevel.Warning, "Failed to deserialize message: {message}.")]
+    static partial void LogFailedDeserialization(ILogger<RedisPubSubSource> logger, string? message);
 }
