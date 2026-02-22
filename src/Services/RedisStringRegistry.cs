@@ -81,8 +81,7 @@ public partial class RedisStringRegistry(
             return value;
         }
     }
-
-    // TODO: Call on start.
+    
     public async Task WarmAsync()
     {
         var strings = await _database.SortedSetRangeByRankWithScoresAsync(MappingKey);

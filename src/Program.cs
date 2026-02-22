@@ -34,8 +34,9 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer
 }));
 
 builder.Services.AddSingleton<MmDbReader>();
-builder.Services.AddSingleton<IStringRegistry, RedisStringRegistry>();
 builder.Services.AddSingleton<IEventRepository, RedisEventRepository>();
+builder.Services.AddSingleton<IStringRegistry, RedisStringRegistry>();
+builder.Services.AddHostedService<StringRegistryInitializer>();
 
 // Pipeline.
 var eventChannel = Channel.CreateBounded<ProxyEvent>(new BoundedChannelOptions(250_000)
