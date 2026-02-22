@@ -2,6 +2,8 @@
 
 public class AppConfig
 {
-    public ServerConfig Server { get; set; } = new();
-    public List<string> ApiKeys { get; set; } = [];
+    public required ServerConfig Server { get; init; }
+    public required List<string> ApiKeys { get; init; } = [];
+    public required RedisSourceConfig Source { get; init; }
+    public required RedisSinkConfig Sink { get; init; }
 }

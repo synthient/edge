@@ -2,6 +2,6 @@
 
 public class ServerConfig
 {
-    public string Host { get; set; } = "127.0.0.1";
-    public int Port { get; set; } = 8080;
+    public required string Host { get; init; }
+    public required int Port { get; init; }
 }

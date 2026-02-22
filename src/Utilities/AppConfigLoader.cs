@@ -1,6 +1,7 @@
 ﻿using System.Text.RegularExpressions;
 using Synthient.Edge.Exceptions;
 using Synthient.Edge.Models.Config;
+using Synthient.Edge.Models.Config.Definitions;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -18,17 +19,24 @@ public sealed partial class AppConfigLoader
         {
             var path = GetConfigPath(args);
             var text = ReadConfigFile(path);
-            return Deserialize(text);
+            var definition = Deserialize(text);
+
+            return definition.Build();
+        }
+        catch (ConfigValidationException ex)
+        {
+            Console.Error.WriteLine($"Config error at '{ex.Field}': {ex.Message}");
         }
         catch (ConfigException ex)
         {
             Console.Error.WriteLine(ex.Message);
-            Environment.Exit(1);
-            return null!;
         }
+
+        Environment.Exit(1);
+        return null!;
     }
 
-    private static AppConfig Deserialize(string text)
+    private static AppConfigDefinition Deserialize(string text)
     {
         var deserializer = new DeserializerBuilder()
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
@@ -37,7 +45,7 @@ public sealed partial class AppConfigLoader
 
         try
         {
-            return deserializer.Deserialize<AppConfig>(text);
+            return deserializer.Deserialize<AppConfigDefinition>(text);
         }
         catch (YamlException ex)
         {
