@@ -1,0 +1,2 @@
+﻿global using MmdbData = System.Collections.Generic.Dictionary<string, object>;
+global using FilterFunc = System.Func<Synthient.Edge.Models.ProxyEvent, System.Collections.Generic.Dictionary<string, object>?, bool>;

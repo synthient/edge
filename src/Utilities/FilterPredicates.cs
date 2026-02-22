@@ -1,15 +1,26 @@
-﻿using Synthient.Edge.Models;
-
-namespace Synthient.Edge.Utilities;
-
-using MmdbData = Dictionary<string, object>;
+﻿namespace Synthient.Edge.Utilities;
 
 internal static class FilterPredicates
 {
-    public static Func<ProxyEvent, MmdbData?, bool> And(
-        Func<ProxyEvent, MmdbData?, bool> left,
-        Func<ProxyEvent, MmdbData?, bool> right
-    ) => (evt, mmdb) => left(evt, mmdb) && right(evt, mmdb);
+    public static readonly FilterFunc PassAll = static (_, _) => true;
 
-    public static Func<ProxyEvent, MmdbData?, bool> Pass() => static (_, _) => true;
+    public static FilterFunc Or(FilterFunc left, FilterFunc right) =>
+        (evt, mmdb) => left(evt, mmdb) || right(evt, mmdb);
+
+    public static FilterFunc Fold(FilterFunc[] filters, Func<FilterFunc, FilterFunc, FilterFunc> combine)
+    {
+        var result = filters[0];
+        for (var i = 1; i < filters.Length; i++)
+            result = combine(result, filters[i]);
+        return result;
+    }
+
+    public static FilterFunc Not(FilterFunc filter) =>
+        (evt, mmdb) => !filter(evt, mmdb);
+
+    public static FilterFunc AndChain(FilterFunc? combined, FilterFunc next) =>
+        combined is null ? next : And(combined, next);
+
+    private static FilterFunc And(FilterFunc left, FilterFunc right) 
+        => (evt, mmdb) => left(evt, mmdb) && right(evt, mmdb);
 }

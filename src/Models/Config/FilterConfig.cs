@@ -11,20 +11,22 @@ public class FilterConfig(
 )
 {
     private const string MmdbPrefix = "mmdb.";
-    private readonly Func<ProxyEvent, MmdbData?, bool> _predicate = Compile(providers, mmdbFilters);
+    private readonly FilterFunc _predicate = Compile(providers, mmdbFilters);
+
+    public bool RequiresMmdb { get; } = mmdbFilters.Count > 0;
 
     public bool Matches(ProxyEvent evt, MmdbData? mmdb) => _predicate(evt, mmdb);
 
-    private static Func<ProxyEvent, MmdbData?, bool> Compile(
+    private static FilterFunc Compile(
         FrozenSet<string>? providers,
-        FrozenDictionary<string, FrozenSet<string>>? mmdbFilters)
+        FrozenDictionary<string, FrozenSet<string>>? mmdbFilters
+    )
     {
-        Func<ProxyEvent, MmdbData?, bool>? combined = null;
+        FilterFunc? combined = null;
 
         if (providers is { Count: > 0 })
-        {
-            combined = (evt, _) => providers.Contains(evt.Provider);
-        }
+            combined = FilterPredicates.AndChain(combined, (evt, _) => providers.Contains(evt.Provider));
+
 
         if (mmdbFilters is { Count: > 0 })
         {
@@ -34,16 +36,14 @@ public class FilterConfig(
                 var lookup = BuildMmdbLookup(segments);
                 var expected = expectedValues;
 
-                Func<ProxyEvent, MmdbData?, bool> mmdbPredicate = (_, mmdb) =>
+                combined = FilterPredicates.AndChain(combined, (_, mmdb) =>
                     mmdb is not null
                     && lookup(mmdb) is { } actual
-                    && MmdbValueMatches(actual, expected);
-
-                combined = combined is null ? mmdbPredicate : FilterPredicates.And(combined, mmdbPredicate);
+                    && MmdbValueMatches(actual, expected));
             }
         }
 
-        return combined ?? FilterPredicates.Pass();
+        return combined ?? FilterPredicates.PassAll;
     }
 
     private static bool MmdbValueMatches(object actual, FrozenSet<string> expected) =>

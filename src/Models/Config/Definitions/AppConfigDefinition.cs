@@ -1,4 +1,5 @@
-﻿using Synthient.Edge.Exceptions;
+﻿using System.Collections.Frozen;
+using Synthient.Edge.Exceptions;
 
 namespace Synthient.Edge.Models.Config.Definitions;
 
@@ -10,12 +11,23 @@ public class AppConfigDefinition : IConfigDefinition<AppConfig>
     public RedisSinkDefinition? Sink { get; set; }
     public MmDbDefinition? Mmdb { get; set; }
     public Dictionary<string, FilterDefinition> Filters { get; set; } = [];
+    public Dictionary<string, BucketDefinition> Buckets { get; set; } = [];
 
     public AppConfig Build()
     {
         ConfigValidationException.ThrowIfNull("source", Source);
         ConfigValidationException.ThrowIfNull("sink", Sink);
         ConfigValidationException.ThrowIfNull("mmdb", Mmdb);
+
+        if (Buckets is null || Buckets.Count == 0)
+            throw new ConfigValidationException("buckets", "At least one bucket must be defined.");
+
+        var filters = Filters.ToFrozenDictionary(kv => kv.Key, kv => kv.Value.Build(kv.Key));
+
+        var buckets = Buckets.ToFrozenDictionary(
+            kv => kv.Key,
+            kv => kv.Value.Build(kv.Key, filters)
+        );
 
         return new AppConfig
         {
@@ -24,7 +36,8 @@ public class AppConfigDefinition : IConfigDefinition<AppConfig>
             Source = Source.Build(),
             Sink = Sink.Build(),
             Mmdb = Mmdb.Build(),
-            Filters = Filters.ToDictionary(kv => kv.Key, kv => kv.Value.Build(kv.Key))
+            Filters = filters,
+            Buckets = buckets
         };
     }
 }
