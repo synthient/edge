@@ -101,20 +101,20 @@ public sealed partial class RedisPubSubSource(
     };
 
     [LoggerMessage(LogLevel.Error, "Redis connection failed. Reconnecting in {backoff:g}.")]
-    static partial void LogConnectionFailed(ILogger<RedisPubSubSource> logger, Exception ex, TimeSpan backoff);
+    private static partial void LogConnectionFailed(ILogger<RedisPubSubSource> logger, Exception ex, TimeSpan backoff);
 
     [LoggerMessage(LogLevel.Critical, "Unexpected error in Redis source. The pipeline may be degraded.")]
-    static partial void LogUnexpectedError(ILogger<RedisPubSubSource> logger, Exception ex);
+    private static partial void LogUnexpectedError(ILogger<RedisPubSubSource> logger, Exception ex);
 
     [LoggerMessage(LogLevel.Information, "Redis source stopped.")]
-    static partial void LogSourceStopped(ILogger<RedisPubSubSource> logger);
+    private static partial void LogSourceStopped(ILogger<RedisPubSubSource> logger);
 
     [LoggerMessage(LogLevel.Information, "Connecting to Redis source ({endpoint})")]
-    static partial void LogConnecting(ILogger<RedisPubSubSource> logger, string endpoint);
+    private static partial void LogConnecting(ILogger<RedisPubSubSource> logger, string endpoint);
 
     [LoggerMessage(LogLevel.Information, "Subscribed to Redis channel '{channel}'.")]
-    static partial void LogSubscribed(ILogger<RedisPubSubSource> logger, RedisChannel channel);
+    private static partial void LogSubscribed(ILogger<RedisPubSubSource> logger, RedisChannel channel);
 
     [LoggerMessage(LogLevel.Warning, "Failed to deserialize message: {message}.")]
-    static partial void LogFailedDeserialization(ILogger<RedisPubSubSource> logger, string? message);
+    private static partial void LogFailedDeserialization(ILogger<RedisPubSubSource> logger, string? message);
 }
