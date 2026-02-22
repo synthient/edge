@@ -59,10 +59,18 @@ public static class ContextEndpoints
         if (!IPAddress.TryParse(ip, out var ipAddress))
             return TypedResults.BadRequest($"'{ip}' is not a valid IP address.");
 
-        var result = await repo.GetBucketAsync(ipAddress, bucket, ct);
-        if (result is null)
+        var bucketResult = await repo.GetBucketAsync(ipAddress, bucket, ct);
+        if (bucketResult is null)
             return TypedResults.NotFound();
 
-        return TypedResults.Ok(result);
+        var response = new ContextIpBucketResponse
+        {
+            Ip = ip,
+            Bucket = bucket,
+            Ttl = bucketResult.Ttl,
+            Enriched = bucketResult.Providers
+        };
+
+        return TypedResults.Ok(response);
     }
 }
