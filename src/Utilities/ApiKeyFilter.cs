@@ -23,9 +23,9 @@ public sealed class ApiKeyFilter(AppConfig config) : IEndpointFilter
             return Results.Unauthorized(); // No API key header set.
         }
 
-        var providedApiKey = headerValues.ToString().Trim();
+        var providedApiKey = headerValues.FirstOrDefault()?.Trim();
 
-        if (!_apiKeys.Contains(providedApiKey))
+        if (string.IsNullOrEmpty(providedApiKey) || !_apiKeys.Contains(providedApiKey))
             return Results.Unauthorized(); // Invalid API key provided.
 
         return await next(context);

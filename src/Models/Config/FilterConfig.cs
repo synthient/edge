@@ -3,9 +3,7 @@ using Synthient.Edge.Utilities;
 
 namespace Synthient.Edge.Models.Config;
 
-using MmdbData = Dictionary<string, object>;
-
-public class FilterConfig(
+public sealed class FilterConfig(
     FrozenSet<string> providers,
     FrozenDictionary<string, FrozenSet<string>> mmdbFilters
 )

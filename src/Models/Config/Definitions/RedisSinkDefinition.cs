@@ -2,7 +2,7 @@
 
 namespace Synthient.Edge.Models.Config.Definitions;
 
-public class RedisSinkDefinition : IConfigDefinition<RedisSinkConfig>
+public sealed class RedisSinkDefinition : IConfigDefinition<RedisSinkConfig>
 {
     public string? Endpoint { get; set; }
     public string? Password { get; set; }
@@ -13,12 +13,6 @@ public class RedisSinkDefinition : IConfigDefinition<RedisSinkConfig>
     {
         ConfigValidationException.ThrowIfNullOrEmpty("sink.endpoint", Endpoint);
 
-        return new RedisSinkConfig
-        {
-            Endpoint = Endpoint,
-            Password = Password,
-            Ssl = Ssl,
-            Database = Database
-        };
+        return new RedisSinkConfig(Endpoint, Password, Ssl, Database);
     }
 }

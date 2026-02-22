@@ -2,7 +2,7 @@
 
 namespace Synthient.Edge.Models.Config.Definitions;
 
-public class BucketDefinition
+public sealed class BucketDefinition
 {
     public string? Ttl { get; set; }
     public string[]? All { get; set; }
@@ -17,9 +17,10 @@ public class BucketDefinition
 
         if (!TimeSpan.TryParse(Ttl, out var ttl))
             throw new ConfigValidationException(
-                $"{bucketKey}.ttl", $"TTL value '{Ttl}' is not a valid time format. Expected format: hh:mm:ss."
+                $"{bucketKey}.ttl",
+                $"TTL '{Ttl}' is not a valid timespan. Examples: '00:05:00' (5 minutes), '24:00:00' (24 hours)."
             );
-        
+
         var (allFilters, allMmdb) = ResolveFilters(All, bucketKey, filters);
         var (anyFilters, anyMmdb) = ResolveFilters(Any, bucketKey, filters);
         var (notFilters, notMmdb) = ResolveFilters(Not, bucketKey, filters);

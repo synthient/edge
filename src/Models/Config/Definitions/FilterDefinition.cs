@@ -4,7 +4,7 @@ using YamlDotNet.Serialization;
 
 namespace Synthient.Edge.Models.Config.Definitions;
 
-public class FilterDefinition : IKeyedConfigDefinition<FilterConfig>
+public sealed class FilterDefinition : IKeyedConfigDefinition<FilterConfig>
 {
     private const string MmdbPrefix = "mmdb.";
 

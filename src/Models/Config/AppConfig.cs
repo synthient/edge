@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Synthient.Edge.Models.Config;
 
-public class AppConfig
+public sealed class AppConfig
 {
     public required ServerConfig Server { get; init; }
     public required List<string> ApiKeys { get; init; } = [];

@@ -1,9 +1,3 @@
 ﻿namespace Synthient.Edge.Models.Config;
 
-public class RedisSourceConfig
-{
-    public required string Endpoint { get; init; }
-    public required string? Password { get; init; }
-    public required bool Ssl { get; init; }
-    public required string Channel { get; init; }
-}
+public sealed record RedisSourceConfig(string Endpoint, string? Password, bool Ssl, string Channel);

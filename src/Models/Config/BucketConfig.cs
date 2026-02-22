@@ -2,7 +2,7 @@
 
 namespace Synthient.Edge.Models.Config;
 
-public class BucketConfig(
+public sealed class BucketConfig(
     TimeSpan ttl,
     bool requiresMmdb,
     FilterFunc[] allFilters,

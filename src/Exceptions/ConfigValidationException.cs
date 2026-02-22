@@ -2,13 +2,13 @@
 
 namespace Synthient.Edge.Exceptions;
 
-public class ConfigValidationException(string field, string message) : ConfigException(message)
+public sealed class ConfigValidationException(string field, string message) : ConfigException(message)
 {
     public string Field { get; } = field;
 
     public static void ThrowIfNullOrEmpty(string field, [NotNull] string? value)
     {
-        if (string.IsNullOrEmpty(value))
+        if (string.IsNullOrWhiteSpace(value))
             throw new ConfigValidationException(field, "Field is required and cannot be empty.");
     }
 

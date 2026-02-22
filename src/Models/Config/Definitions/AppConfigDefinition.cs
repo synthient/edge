@@ -3,7 +3,7 @@ using Synthient.Edge.Exceptions;
 
 namespace Synthient.Edge.Models.Config.Definitions;
 
-public class AppConfigDefinition : IConfigDefinition<AppConfig>
+public sealed class AppConfigDefinition : IConfigDefinition<AppConfig>
 {
     public ServerDefinition Server { get; set; } = new();
     public List<string> ApiKeys { get; set; } = [];
@@ -19,7 +19,7 @@ public class AppConfigDefinition : IConfigDefinition<AppConfig>
         ConfigValidationException.ThrowIfNull("sink", Sink);
         ConfigValidationException.ThrowIfNull("mmdb", Mmdb);
 
-        if (Buckets is null || Buckets.Count == 0)
+        if (Buckets.Count == 0)
             throw new ConfigValidationException("buckets", "At least one bucket must be defined.");
 
         var filters = Filters.ToFrozenDictionary(kv => kv.Key, kv => kv.Value.Build(kv.Key));

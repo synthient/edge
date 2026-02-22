@@ -22,7 +22,7 @@ public sealed partial class AppConfigLoader
             var path = GetConfigPath(args);
             var text = ReadConfigFile(path);
             var definition = Deserialize(text);
-
+            
             return definition.Build();
         }
         catch (ConfigValidationException ex)
