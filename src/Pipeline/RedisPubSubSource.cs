@@ -3,12 +3,14 @@ using StackExchange.Redis;
 using Synthient.Edge.Models;
 using Synthient.Edge.Models.Config;
 using Synthient.Edge.Serialization;
+using Synthient.Edge.Services;
 
 namespace Synthient.Edge.Pipeline;
 
 public sealed class RedisPubSubSource(
     AppConfig appConfig,
     ChannelWriter<ProxyEvent> output,
+    MetricsReporter metrics,
     ILogger<RedisPubSubSource> logger
 ) : BackgroundService
 {
@@ -43,8 +45,7 @@ public sealed class RedisPubSubSource(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogCritical(ex,
-                        "Unexpected error in Redis source. The pipeline may be in a degraded state.");
+                    logger.LogCritical(ex, "Unexpected error in Redis source. The pipeline may be degraded.");
                     await Task.Delay(backoff, stoppingToken);
                 }
             }
@@ -83,8 +84,10 @@ public sealed class RedisPubSubSource(
             return;
         }
 
+        metrics.RecordIngested();
+
         if (!output.TryWrite(evt))
-            logger.LogWarning("Event channel is full; dropping event with IP {Ip}.", evt.IpAddress);
+            metrics.RecordDropped();
     }
 
     private static ConfigurationOptions BuildRedisConfiguration(RedisSourceConfig config) => new()

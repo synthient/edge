@@ -10,7 +10,7 @@ public sealed class BucketFilter(
     MmDbReader mmdbReader,
     ChannelReader<ProxyEvent> input,
     ChannelWriter<BucketedEvent> output,
-    ILogger<BucketFilter> logger
+    MetricsReporter metrics
 ) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -25,7 +25,7 @@ public sealed class BucketFilter(
 
                 if (!appConfig.TryMatchBuckets(evt, mmdbData, out var matched))
                 {
-                    logger.LogDebug("Event dropped: unmatched event with IP {Ip}.", evt.IpAddress);
+                    metrics.RecordUnmatched();
                     continue;
                 }
 
