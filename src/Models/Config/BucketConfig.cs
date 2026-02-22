@@ -4,7 +4,7 @@ namespace Synthient.Edge.Models.Config;
 
 public sealed class BucketConfig(
     TimeSpan ttl,
-    bool requiresMmdb,
+    bool filtersRequireMmdb,
     FilterFunc[] allFilters,
     FilterFunc[] anyFilters,
     FilterFunc[] notFilters
@@ -13,7 +13,7 @@ public sealed class BucketConfig(
     private readonly FilterFunc _predicate = Compile(allFilters, anyFilters, notFilters);
 
     public TimeSpan Ttl { get; } = ttl;
-    public bool RequiresMmdb { get; } = requiresMmdb;
+    public bool FiltersRequireMmdb { get; } = filtersRequireMmdb;
 
     public bool Matches(ProxyEvent evt, MmdbData? mmdb) => _predicate(evt, mmdb);
 

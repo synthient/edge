@@ -11,7 +11,18 @@ public sealed class AppConfig
     public required RedisSinkConfig Sink { get; init; }
     public required MmDbConfig Mmdb { get; init; }
     public required FrozenDictionary<string, FilterConfig> Filters { get; init; }
-    public required FrozenDictionary<string, BucketConfig> Buckets { get; init; }
+
+    public required FrozenDictionary<string, BucketConfig> Buckets
+    {
+        get;
+        init
+        {
+            field = value;
+            FiltersRequireMmdb = value.Values.Any(b => b.FiltersRequireMmdb);
+        }
+    } = null!;
+
+    public bool FiltersRequireMmdb { get; private init; }
 
     public bool TryMatchBuckets(
         ProxyEvent evt,

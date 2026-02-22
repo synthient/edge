@@ -30,7 +30,7 @@ public sealed class BucketDefinition
             allFilters: allFilters,
             anyFilters: anyFilters,
             notFilters: notFilters,
-            requiresMmdb: allMmdb || anyMmdb || notMmdb
+            filtersRequireMmdb: allMmdb || anyMmdb || notMmdb
         );
     }
 
