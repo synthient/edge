@@ -2,9 +2,11 @@
 using Synthient.Edge.Exceptions;
 using Synthient.Edge.Models.Config;
 using Synthient.Edge.Models.Config.Definitions;
+using Synthient.Edge.Serialization;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using YamlDotNet.Serialization.NodeDeserializers;
 
 namespace Synthient.Edge.Utilities;
 
@@ -41,6 +43,10 @@ public sealed partial class AppConfigLoader
         var deserializer = new DeserializerBuilder()
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
             .WithDuplicateKeyChecking()
+            .WithNodeDeserializer(
+                inner => new FilterDefinitionDeserializer(inner),
+                s => s.InsteadOf<ObjectNodeDeserializer>()
+            )
             .Build();
 
         try
