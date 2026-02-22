@@ -1,4 +1,4 @@
-﻿namespace Synthient.Edge.Services;
+namespace Synthient.Edge.Services;
 
 public sealed partial class MetricsReporter(ILogger<MetricsReporter> logger) : BackgroundService
 {
@@ -43,7 +43,7 @@ public sealed partial class MetricsReporter(ILogger<MetricsReporter> logger) : B
                 unmatched: unmatchedDelta,
                 unmatchedPerc,
                 dropped,
-                lag: ingested - processed - dropped
+                lag: ingested - processed - dropped - unmatched
             );
 
             (lastIngested, lastProcessed, lastUnmatched) = (ingested, processed, unmatched);
