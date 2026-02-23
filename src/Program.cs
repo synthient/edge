@@ -72,6 +72,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<MetricsReporter>()
 
 var app = builder.Build();
 app.MapContextEndpoints(appConfig);
+app.MapHealthEndpoint(appConfig);
 
 #endregion
 
