@@ -14,7 +14,7 @@ public sealed partial class RedisEventRepository(
     ILogger<RedisEventRepository> logger
 ) : IEventRepository
 {
-    private readonly IDatabase _db = connection.GetDatabase(appConfig.Sink.Database);
+    private readonly IDatabase _database = connection.GetDatabase(appConfig.Sink.Database);
 
     // TODO: Map IP to buckets with a set (instead of hash, we are not using the timestamp).
     private static readonly LuaScript InsertScript = LuaScript.Prepare("""
@@ -63,7 +63,7 @@ public sealed partial class RedisEventRepository(
             var bucketKey = RedisKeyBuilder.BucketKey(bucketedEvt.Event.IpAddress, bucketId);
 
             // TODO: Swallows errors.
-            _ = await _db.ScriptEvaluateAsync(
+            _ = await _database.ScriptEvaluateAsync(
                 InsertScript,
                 new
                 {
@@ -100,7 +100,7 @@ public sealed partial class RedisEventRepository(
     public async Task<IReadOnlyList<BucketResult>> GetAllBucketsAsync(IPAddress ip, CancellationToken cancellationToken)
     {
         var ipKey = RedisKeyBuilder.IpKey(ip);
-        var bucketFields = await _db.HashGetAllAsync(ipKey);
+        var bucketFields = await _database.HashGetAllAsync(ipKey);
         if (bucketFields.Length == 0)
             return [];
 
@@ -108,7 +108,7 @@ public sealed partial class RedisEventRepository(
         var bucketKeys = bucketIds.Select(bucketId => RedisKeyBuilder.BucketKey(ip, bucketId)).ToArray();
 
         // Pipeline all HGETALL + TTL lookups
-        var batch = _db.CreateBatch();
+        var batch = _database.CreateBatch();
         var hashTasks = bucketKeys.Select(k => batch.HashGetAllAsync(k)).ToArray();
         var ttlTasks = bucketKeys.Select(k => batch.KeyTimeToLiveAsync(k)).ToArray();
         batch.Execute();
@@ -138,8 +138,8 @@ public sealed partial class RedisEventRepository(
 
     private async Task<(TimeSpan? Ttl, HashEntry[] Entries)> FetchBucketAsync(RedisKey key)
     {
-        var ttlTask = _db.KeyTimeToLiveAsync(key);
-        var entriesTask = _db.HashGetAllAsync(key);
+        var ttlTask = _database.KeyTimeToLiveAsync(key);
+        var entriesTask = _database.HashGetAllAsync(key);
         await Task.WhenAll(ttlTask, entriesTask);
         return (ttlTask.Result, entriesTask.Result);
     }
