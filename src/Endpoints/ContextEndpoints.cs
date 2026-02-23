@@ -26,7 +26,7 @@ public static class ContextEndpoints
     private static async Task<IResult> LookupIpAsync(
         [FromRoute] string ip,
         [FromServices] IEventRepository repo,
-        [FromServices] MmDbReader mmDbReader,
+        [FromServices] MmdbReader mmdbReader,
         CancellationToken cancellationToken
     )
     {
@@ -37,7 +37,7 @@ public static class ContextEndpoints
         if (bucketResults.Count == 0)
             return TypedResults.NotFound();
 
-        var (network, location) = mmDbReader.LookupNetworkAndLocation(ipAddress);
+        var (network, location) = mmdbReader.LookupNetworkAndLocation(ipAddress);
 
         var response = new ContextIpResponse
         {

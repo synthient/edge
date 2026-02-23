@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace Synthient.Edge.Serialization;
 
-public sealed class LongFromStringConverter : JsonConverter<long>
+public sealed class LongFromStringJsonConverter : JsonConverter<long>
 {
     public override long Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

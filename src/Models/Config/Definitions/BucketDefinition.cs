@@ -34,7 +34,7 @@ public sealed class BucketDefinition
         );
     }
 
-    private static (FilterFunc[] filters, bool requiresMmdb) ResolveFilters(
+    private static (EventFilter[] filters, bool requiresMmdb) ResolveFilters(
         string[]? names,
         string bucketKey,
         IDictionary<string, FilterConfig> filters
@@ -43,7 +43,7 @@ public sealed class BucketDefinition
         if (names is not { Length: > 0 })
             return ([], false);
 
-        var resolved = new FilterFunc[names.Length];
+        var resolved = new EventFilter[names.Length];
         var requiresMmdb = false;
 
         for (var i = 0; i < names.Length; i++)

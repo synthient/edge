@@ -5,21 +5,21 @@ namespace Synthient.Edge.Models.Config;
 public sealed class BucketConfig(
     TimeSpan ttl,
     bool filtersRequireMmdb,
-    FilterFunc[] allFilters,
-    FilterFunc[] anyFilters,
-    FilterFunc[] notFilters
+    EventFilter[] allFilters,
+    EventFilter[] anyFilters,
+    EventFilter[] notFilters
 )
 {
-    private readonly FilterFunc _predicate = Compile(allFilters, anyFilters, notFilters);
+    private readonly EventFilter _predicate = Compile(allFilters, anyFilters, notFilters);
 
     public TimeSpan Ttl { get; } = ttl;
     public bool FiltersRequireMmdb { get; } = filtersRequireMmdb;
 
     public bool Matches(ProxyEvent evt, MmdbData? mmdb) => _predicate(evt, mmdb);
 
-    private static FilterFunc Compile(FilterFunc[] all, FilterFunc[] any, FilterFunc[] not)
+    private static EventFilter Compile(EventFilter[] all, EventFilter[] any, EventFilter[] not)
     {
-        FilterFunc? combined = null;
+        EventFilter? combined = null;
 
         // Reject if any NOT filter matches
         foreach (var f in not)

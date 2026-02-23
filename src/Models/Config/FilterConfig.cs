@@ -9,18 +9,18 @@ public sealed class FilterConfig(
 )
 {
     private const string MmdbPrefix = "mmdb.";
-    private readonly FilterFunc _predicate = Compile(providers, mmdbFilters);
+    private readonly EventFilter _predicate = Compile(providers, mmdbFilters);
 
     public bool RequiresMmdb { get; } = mmdbFilters.Count > 0;
 
     public bool Matches(ProxyEvent evt, MmdbData? mmdb) => _predicate(evt, mmdb);
 
-    private static FilterFunc Compile(
+    private static EventFilter Compile(
         FrozenSet<string>? providers,
         FrozenDictionary<string, FrozenSet<string>>? mmdbFilters
     )
     {
-        FilterFunc? combined = null;
+        EventFilter? combined = null;
 
         if (providers is { Count: > 0 })
             combined = FilterPredicates.AndChain(combined, (evt, _) => providers.Contains(evt.Provider));

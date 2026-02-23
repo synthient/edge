@@ -33,7 +33,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer
     SyncTimeout = 5_000,
 }));
 
-builder.Services.AddSingleton<MmDbReader>();
+builder.Services.AddSingleton<MmdbReader>();
 builder.Services.AddSingleton<IEventRepository, RedisEventRepository>();
 builder.Services.AddSingleton<IStringRegistry, RedisStringRegistry>();
 builder.Services.AddHostedService<StringRegistryInitializer>();

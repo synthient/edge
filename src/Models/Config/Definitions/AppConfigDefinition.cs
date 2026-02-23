@@ -3,13 +3,14 @@ using Synthient.Edge.Exceptions;
 
 namespace Synthient.Edge.Models.Config.Definitions;
 
+// ReSharper disable CollectionNeverUpdated.Global
 public sealed class AppConfigDefinition : IConfigDefinition<AppConfig>
 {
     public ServerDefinition Server { get; set; } = new();
     public List<string> ApiKeys { get; set; } = [];
     public RedisSourceDefinition? Source { get; set; }
     public RedisSinkDefinition? Sink { get; set; }
-    public MmDbDefinition? Mmdb { get; set; }
+    public MmdbDefinition? Mmdb { get; set; }
     public Dictionary<string, FilterDefinition> Filters { get; set; } = [];
     public Dictionary<string, BucketDefinition> Buckets { get; set; } = [];
 
@@ -30,14 +31,13 @@ public sealed class AppConfigDefinition : IConfigDefinition<AppConfig>
         );
 
         return new AppConfig
-        {
-            Server = Server.Build(),
-            ApiKeys = ApiKeys,
-            Source = Source.Build(),
-            Sink = Sink.Build(),
-            Mmdb = Mmdb.Build(),
-            Filters = filters,
-            Buckets = buckets
-        };
+        (
+            Server: Server.Build(),
+            ApiKeys: ApiKeys,
+            Source: Source.Build(),
+            Sink: Sink.Build(),
+            Mmdb: Mmdb.Build(),
+            Buckets: buckets
+        );
     }
 }

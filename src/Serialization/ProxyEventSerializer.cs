@@ -11,16 +11,10 @@ public static class ProxyEventSerializer
     {
         try
         {
-            var span = ((ReadOnlyMemory<byte>)message).Span;
-            evt = JsonSerializer.Deserialize(span, ProxyEventJsonContext.Default.ProxyEvent);
+            ReadOnlyMemory<byte> messageBytes = message;
+            evt = JsonSerializer.Deserialize(messageBytes.Span, ProxyEventJsonContext.Default.ProxyEvent);
 
-            if (evt is null)
-            {
-                evt = null;
-                return false;
-            }
-
-            return true;
+            return evt is not null;
         }
         catch (JsonException)
         {

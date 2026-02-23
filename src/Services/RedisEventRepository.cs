@@ -17,30 +17,31 @@ public sealed partial class RedisEventRepository(
     private readonly IDatabase _database = connection.GetDatabase(appConfig.Sink.Database);
 
     // TODO: Map IP to buckets with a set (instead of hash, we are not using the timestamp).
-    private static readonly LuaScript InsertScript = LuaScript.Prepare("""
-                                                                       local current = redis.call('HGET', @bucketKey, @providerId)
-                                                                       local count   = 1
+    private static readonly LuaScript InsertScript = LuaScript.Prepare(
+        """
+        local current = redis.call('HGET', @bucketKey, @providerId)
+        local count   = 1
 
-                                                                       if current then
-                                                                           -- Read count from first 4 bytes: big-endian int32
-                                                                           count = struct.unpack('>i4', current) + 1
-                                                                       end
+        if current then
+            -- Read count from first 4 bytes: big-endian int32
+            count = struct.unpack('>i4', current) + 1
+        end
 
-                                                                       -- [count: 4B int32][timestamp: 8B int64]
-                                                                       redis.call('HSET', @bucketKey, @providerId, struct.pack('>i4l', count, @timestamp))
+        -- [count: 4B int32][timestamp: 8B int64]
+        redis.call('HSET', @bucketKey, @providerId, struct.pack('>i4l', count, @timestamp))
 
-                                                                       -- [timestamp: 8B int64]
-                                                                       redis.call('HSET', @ipKey, @bucketId, struct.pack('>l', @timestamp))
+        -- [timestamp: 8B int64]
+        redis.call('HSET', @ipKey, @bucketId, struct.pack('>l', @timestamp))
 
-                                                                       -- Set TTL on first write (NX), extend if the new expiry is later (GT)
-                                                                       if redis.call('PEXPIREAT', @bucketKey, @ttlMs, 'NX') == 0 then
-                                                                           redis.call('PEXPIREAT', @bucketKey, @ttlMs, 'GT')
-                                                                       end
+        -- Set TTL on first write (NX), extend if the new expiry is later (GT)
+        if redis.call('PEXPIREAT', @bucketKey, @ttlMs, 'NX') == 0 then
+            redis.call('PEXPIREAT', @bucketKey, @ttlMs, 'GT')
+        end
 
-                                                                       if redis.call('PEXPIREAT', @ipKey, @ttlMs, 'NX') == 0 then
-                                                                           redis.call('PEXPIREAT', @ipKey, @ttlMs, 'GT')
-                                                                       end
-                                                                       """);
+        if redis.call('PEXPIREAT', @ipKey, @ttlMs, 'NX') == 0 then
+            redis.call('PEXPIREAT', @ipKey, @ttlMs, 'GT')
+        end
+        """);
 
     public async Task InsertAsync(BucketedEvent bucketedEvt, CancellationToken cancellationToken)
     {

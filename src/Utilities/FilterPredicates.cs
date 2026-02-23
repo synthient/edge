@@ -1,13 +1,15 @@
-﻿namespace Synthient.Edge.Utilities;
+﻿using Synthient.Edge.Models;
+
+namespace Synthient.Edge.Utilities;
 
 internal static class FilterPredicates
 {
-    public static readonly FilterFunc PassAll = static (_, _) => true;
+    public static readonly EventFilter PassAll = static (_, _) => true;
 
-    public static FilterFunc Or(FilterFunc left, FilterFunc right) =>
+    public static EventFilter Or(EventFilter left, EventFilter right) =>
         (evt, mmdb) => left(evt, mmdb) || right(evt, mmdb);
 
-    public static FilterFunc Fold(FilterFunc[] filters, Func<FilterFunc, FilterFunc, FilterFunc> combine)
+    public static EventFilter Fold(EventFilter[] filters, Func<EventFilter, EventFilter, EventFilter> combine)
     {
         if (filters.Length == 0)
             throw new ArgumentException("At least one filter is required.", nameof(filters));
@@ -18,12 +20,12 @@ internal static class FilterPredicates
         return result;
     }
 
-    public static FilterFunc Not(FilterFunc filter) =>
+    public static EventFilter Not(EventFilter filter) =>
         (evt, mmdb) => !filter(evt, mmdb);
 
-    public static FilterFunc AndChain(FilterFunc? combined, FilterFunc next) =>
+    public static EventFilter AndChain(EventFilter? combined, EventFilter next) =>
         combined is null ? next : And(combined, next);
 
-    private static FilterFunc And(FilterFunc left, FilterFunc right)
+    private static EventFilter And(EventFilter left, EventFilter right)
         => (evt, mmdb) => left(evt, mmdb) && right(evt, mmdb);
 }

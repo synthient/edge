@@ -3,26 +3,16 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Synthient.Edge.Models.Config;
 
-public sealed class AppConfig
+public sealed record AppConfig(
+    ServerConfig Server,
+    IReadOnlyList<string> ApiKeys,
+    RedisSourceConfig Source,
+    RedisSinkConfig Sink,
+    MmdbConfig Mmdb,
+    FrozenDictionary<string, BucketConfig> Buckets
+)
 {
-    public required ServerConfig Server { get; init; }
-    public required List<string> ApiKeys { get; init; } = [];
-    public required RedisSourceConfig Source { get; init; }
-    public required RedisSinkConfig Sink { get; init; }
-    public required MmDbConfig Mmdb { get; init; }
-    public required FrozenDictionary<string, FilterConfig> Filters { get; init; }
-
-    public required FrozenDictionary<string, BucketConfig> Buckets
-    {
-        get;
-        init
-        {
-            field = value;
-            FiltersRequireMmdb = value.Values.Any(b => b.FiltersRequireMmdb);
-        }
-    } = null!;
-
-    public bool FiltersRequireMmdb { get; private init; }
+    public bool FiltersRequireMmdb { get; } = Buckets.Values.Any(bucket => bucket.FiltersRequireMmdb);
 
     public bool TryMatchBuckets(
         ProxyEvent evt,
