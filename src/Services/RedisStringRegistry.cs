@@ -6,7 +6,7 @@ using Synthient.Edge.Models.Config;
 namespace Synthient.Edge.Services;
 
 /// <summary>
-/// Maaps strings to integer IDs, backed by Redis. Its purpose is to reduce bandwidth and storage by replacing repeated low-cardinality strings with (smaller) integers.
+/// Maps strings to integer IDs, backed by Redis. Its purpose is to reduce bandwidth and storage by replacing repeated low-cardinality strings with (smaller) integers.
 /// </summary>
 public partial class RedisStringRegistry(
     IConnectionMultiplexer connection,
