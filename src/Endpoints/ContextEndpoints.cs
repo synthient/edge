@@ -26,7 +26,7 @@ public static class ContextEndpoints
     private static async Task<IResult> LookupIpAsync(
         [FromRoute] string ip,
         [FromServices] IEventRepository repo,
-        [FromServices] FileMmdbReader fileMmdbReader,
+        [FromServices] IMmdbReader fileMmdbReader,
         CancellationToken cancellationToken
     )
     {
