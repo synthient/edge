@@ -26,7 +26,7 @@ public static class ContextEndpoints
     private static async Task<IResult> LookupIpAsync(
         [FromRoute] string ip,
         [FromServices] IEventRepository repo,
-        [FromServices] MmdbReader mmdbReader,
+        [FromServices] FileMmdbReader fileMmdbReader,
         CancellationToken cancellationToken
     )
     {
@@ -37,7 +37,7 @@ public static class ContextEndpoints
         if (bucketResults.Count == 0)
             return TypedResults.NotFound();
 
-        var (network, location) = mmdbReader.LookupNetworkAndLocation(ipAddress);
+        var (network, location) = fileMmdbReader.LookupNetworkAndLocation(ipAddress);
 
         var response = new ContextIpResponse
         {
@@ -51,15 +51,16 @@ public static class ContextEndpoints
     }
 
     private static async Task<IResult> LookupBucketAsync(
-        string ip,
-        string bucket,
+        [FromRoute] string ip,
+        [FromRoute] string bucket,
         [FromServices] IEventRepository repo,
-        CancellationToken ct)
+        CancellationToken cancellationToken
+    )
     {
         if (!IPAddress.TryParse(ip, out var ipAddress))
             return TypedResults.BadRequest($"'{ip}' is not a valid IP address.");
 
-        var bucketResult = await repo.GetBucketAsync(ipAddress, bucket, ct);
+        var bucketResult = await repo.GetBucketAsync(ipAddress, bucket, cancellationToken);
         if (bucketResult is null)
             return TypedResults.NotFound();
 

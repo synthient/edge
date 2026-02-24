@@ -1,6 +1,6 @@
 ﻿namespace Synthient.Edge.Services;
 
-public class StringRegistryInitializer(IStringRegistry registry) : IHostedService
+public sealed class StringRegistryInitializer(IStringRegistry registry) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken) => registry.WarmAsync();
 

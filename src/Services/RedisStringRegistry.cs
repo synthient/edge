@@ -8,7 +8,7 @@ namespace Synthient.Edge.Services;
 /// <summary>
 /// Maps strings to integer IDs, backed by Redis. Its purpose is to reduce bandwidth and storage by replacing repeated low-cardinality strings with (smaller) integers.
 /// </summary>
-public partial class RedisStringRegistry(
+public sealed partial class RedisStringRegistry(
     IConnectionMultiplexer connection,
     AppConfig appConfig,
     ILogger<RedisStringRegistry> logger
@@ -81,7 +81,7 @@ public partial class RedisStringRegistry(
             return value;
         }
     }
-    
+
     public async Task WarmAsync()
     {
         var strings = await _database.SortedSetRangeByRankWithScoresAsync(MappingKey);

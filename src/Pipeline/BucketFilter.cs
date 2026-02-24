@@ -7,7 +7,7 @@ namespace Synthient.Edge.Pipeline;
 
 public sealed class BucketFilter(
     AppConfig appConfig,
-    MmdbReader mmdbReader,
+    IMmdbReader mmdbReader,
     ChannelReader<ProxyEvent> input,
     ChannelWriter<BucketedEvent> output,
     MetricsReporter metrics

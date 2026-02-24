@@ -33,7 +33,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer
     SyncTimeout = 5_000,
 }));
 
-builder.Services.AddSingleton<MmdbReader>();
+builder.Services.AddSingleton<IMmdbReader, FileMmdbReader>();
 builder.Services.AddSingleton<IEventRepository, RedisEventRepository>();
 builder.Services.AddSingleton<IStringRegistry, RedisStringRegistry>();
 builder.Services.AddHostedService<StringRegistryInitializer>();
@@ -43,13 +43,13 @@ var eventChannel = Channel.CreateBounded<ProxyEvent>(new BoundedChannelOptions(2
 {
     FullMode = BoundedChannelFullMode.DropWrite,
     SingleWriter = true,
-    SingleReader = false
+    SingleReader = true
 });
 
 var bucketedEventChannel = Channel.CreateBounded<BucketedEvent>(new BoundedChannelOptions(250_000)
 {
     FullMode = BoundedChannelFullMode.Wait,
-    SingleWriter = false,
+    SingleWriter = true,
     SingleReader = true
 });
 

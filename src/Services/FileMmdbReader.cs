@@ -5,7 +5,7 @@ using Synthient.Edge.Models.Config;
 
 namespace Synthient.Edge.Services;
 
-public class MmdbReader(AppConfig appConfig, ILogger<MmdbReader> logger) : IDisposable
+public sealed class FileMmdbReader(AppConfig appConfig, ILogger<FileMmdbReader> logger) : IMmdbReader, IDisposable
 {
     private readonly Reader _mmdbReader = new(appConfig.Mmdb.Path);
 
@@ -35,6 +35,5 @@ public class MmdbReader(AppConfig appConfig, ILogger<MmdbReader> logger) : IDisp
     public void Dispose()
     {
         _mmdbReader.Dispose();
-        GC.SuppressFinalize(this);
     }
 }
