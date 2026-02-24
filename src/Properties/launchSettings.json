@@ -9,7 +9,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "commandLineArgs": "../config.yml"
+      "commandLineArgs": "../edge-config.yml"
     },
     "https": {
       "commandName": "Project",
@@ -19,7 +19,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "commandLineArgs": "../config.yml"
+      "commandLineArgs": "../edge-config.yml"
     }
   }
 }
