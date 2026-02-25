@@ -5,7 +5,7 @@ namespace Synthient.Edge.Services;
 
 public interface IEventRepository
 {
-    Task InsertAsync(BucketedEvent bucketedEvt, CancellationToken cancellationToken);
+    Task InsertAsync(BucketedEvent bucketedEvent, CancellationToken cancellationToken);
     Task<BucketResult?> GetBucketAsync(IPAddress ip, string bucketName, CancellationToken cancellationToken);
     Task<IReadOnlyList<BucketResult>> GetAllBucketsAsync(IPAddress ip, CancellationToken cancellationToken);
 }

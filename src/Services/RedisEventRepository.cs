@@ -43,13 +43,16 @@ public sealed partial class RedisEventRepository(
         end
         """);
 
-    public async Task InsertAsync(BucketedEvent bucketedEvt, CancellationToken cancellationToken)
+    public async Task InsertAsync(BucketedEvent bucketedEvent, CancellationToken cancellationToken)
     {
-        var eventTime = DateTimeOffset.FromUnixTimeSeconds(bucketedEvt.Event.Timestamp);
-        var providerId = await strings.GetOrCreateIdAsync(bucketedEvt.Event.Provider, cancellationToken);
+        var eventTime = DateTimeOffset.FromUnixTimeSeconds(bucketedEvent.Event.Timestamp);
+        var providerId = await strings.GetOrCreateIdAsync(bucketedEvent.Event.Provider, cancellationToken);
 
-        foreach (var (bucketName, bucket) in bucketedEvt.Buckets)
+
+        for (var i = 0; i < bucketedEvent.Matches; i++)
         {
+            var (bucketName, bucket) = bucketedEvent.Buckets[i];
+
             var ttlAt = eventTime + bucket.Ttl;
             if (ttlAt <= DateTimeOffset.UtcNow)
             {
@@ -60,8 +63,8 @@ public sealed partial class RedisEventRepository(
             var bucketId = await strings.GetOrCreateIdAsync(bucketName, cancellationToken);
 
             // TODO: Writes IP to bytes twice.
-            var ipKey = RedisKeyBuilder.IpKey(bucketedEvt.Event.IpAddress);
-            var bucketKey = RedisKeyBuilder.BucketKey(bucketedEvt.Event.IpAddress, bucketId);
+            var ipKey = RedisKeyBuilder.IpKey(bucketedEvent.Event.IpAddress);
+            var bucketKey = RedisKeyBuilder.BucketKey(bucketedEvent.Event.IpAddress, bucketId);
 
             // TODO: Swallows errors.
             _ = await _database.ScriptEvaluateAsync(
@@ -73,7 +76,7 @@ public sealed partial class RedisEventRepository(
                     providerId = (RedisValue)providerId,
                     bucketId = (RedisValue)bucketId,
                     ttlMs = ttlAt.ToUnixTimeMilliseconds(),
-                    timestamp = bucketedEvt.Event.Timestamp
+                    timestamp = bucketedEvent.Event.Timestamp
                 },
                 flags: CommandFlags.FireAndForget
             );
