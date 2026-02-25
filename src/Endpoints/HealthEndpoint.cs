@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Synthient.Edge.Config;
 using Synthient.Edge.Models;
-using Synthient.Edge.Models.Config;
 using Synthient.Edge.Utilities;
 
 namespace Synthient.Edge.Endpoints;

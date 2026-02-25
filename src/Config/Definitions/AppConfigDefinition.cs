@@ -1,7 +1,7 @@
 ﻿using System.Collections.Frozen;
 using Synthient.Edge.Exceptions;
 
-namespace Synthient.Edge.Models.Config.Definitions;
+namespace Synthient.Edge.Config.Definitions;
 
 // ReSharper disable CollectionNeverUpdated.Global
 public sealed class AppConfigDefinition : IConfigDefinition<AppConfig>

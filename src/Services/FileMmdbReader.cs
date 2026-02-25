@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using MaxMind.Db;
+using Synthient.Edge.Config;
 using Synthient.Edge.Models;
-using Synthient.Edge.Models.Config;
 
 namespace Synthient.Edge.Services;
 

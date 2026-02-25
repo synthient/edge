@@ -1,4 +1,4 @@
-﻿using Synthient.Edge.Models.Config;
+﻿using Synthient.Edge.Config;
 
 namespace Synthient.Edge.Models;
 

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using AsyncKeyedLock;
 using StackExchange.Redis;
-using Synthient.Edge.Models.Config;
+using Synthient.Edge.Config;
 
 namespace Synthient.Edge.Services;
 

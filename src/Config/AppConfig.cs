@@ -1,7 +1,8 @@
 ﻿using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
+using Synthient.Edge.Models;
 
-namespace Synthient.Edge.Models.Config;
+namespace Synthient.Edge.Config;
 
 public sealed record AppConfig(
     ServerConfig Server,

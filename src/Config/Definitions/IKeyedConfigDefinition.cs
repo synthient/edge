@@ -1,4 +1,4 @@
-﻿namespace Synthient.Edge.Models.Config.Definitions;
+﻿namespace Synthient.Edge.Config.Definitions;
 
 public interface IKeyedConfigDefinition<out T>
 {

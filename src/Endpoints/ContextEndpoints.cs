@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using Microsoft.AspNetCore.Mvc;
+using Synthient.Edge.Config;
 using Synthient.Edge.Models;
-using Synthient.Edge.Models.Config;
 using Synthient.Edge.Services;
 using Synthient.Edge.Utilities;
 

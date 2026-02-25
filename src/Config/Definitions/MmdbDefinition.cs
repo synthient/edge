@@ -1,6 +1,6 @@
 ﻿using Synthient.Edge.Exceptions;
 
-namespace Synthient.Edge.Models.Config.Definitions;
+namespace Synthient.Edge.Config.Definitions;
 
 public sealed class MmdbDefinition : IConfigDefinition<MmdbConfig>
 {

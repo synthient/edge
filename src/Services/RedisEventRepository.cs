@@ -1,8 +1,8 @@
 ﻿using System.Buffers.Binary;
 using System.Net;
 using StackExchange.Redis;
+using Synthient.Edge.Config;
 using Synthient.Edge.Models;
-using Synthient.Edge.Models.Config;
 using Synthient.Edge.Utilities;
 
 namespace Synthient.Edge.Services;

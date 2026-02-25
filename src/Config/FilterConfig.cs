@@ -1,7 +1,8 @@
 ﻿using System.Collections.Frozen;
+using Synthient.Edge.Models;
 using Synthient.Edge.Utilities;
 
-namespace Synthient.Edge.Models.Config;
+namespace Synthient.Edge.Config;
 
 public sealed class FilterConfig(
     FrozenSet<string> providers,

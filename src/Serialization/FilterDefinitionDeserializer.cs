@@ -1,4 +1,4 @@
-﻿using Synthient.Edge.Models.Config.Definitions;
+﻿using Synthient.Edge.Config.Definitions;
 using YamlDotNet.Core;
 using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;

@@ -1,6 +1,7 @@
 ﻿using Synthient.Edge.Exceptions;
+using Synthient.Edge.Models;
 
-namespace Synthient.Edge.Models.Config.Definitions;
+namespace Synthient.Edge.Config.Definitions;
 
 public sealed class BucketDefinition
 {

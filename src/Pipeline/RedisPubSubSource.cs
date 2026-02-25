@@ -1,7 +1,7 @@
 ﻿using System.Threading.Channels;
 using StackExchange.Redis;
+using Synthient.Edge.Config;
 using Synthient.Edge.Models;
-using Synthient.Edge.Models.Config;
 using Synthient.Edge.Serialization;
 using Synthient.Edge.Services;
 

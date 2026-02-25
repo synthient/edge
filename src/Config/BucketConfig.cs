@@ -1,6 +1,7 @@
-﻿using Synthient.Edge.Utilities;
+﻿using Synthient.Edge.Models;
+using Synthient.Edge.Utilities;
 
-namespace Synthient.Edge.Models.Config;
+namespace Synthient.Edge.Config;
 
 public sealed class BucketConfig(
     TimeSpan ttl,

@@ -1,7 +1,7 @@
 ﻿using System.Text.RegularExpressions;
+using Synthient.Edge.Config;
+using Synthient.Edge.Config.Definitions;
 using Synthient.Edge.Exceptions;
-using Synthient.Edge.Models.Config;
-using Synthient.Edge.Models.Config.Definitions;
 using Synthient.Edge.Serialization;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;

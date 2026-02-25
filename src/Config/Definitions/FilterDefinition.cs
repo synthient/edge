@@ -2,7 +2,7 @@
 using Synthient.Edge.Exceptions;
 using YamlDotNet.Serialization;
 
-namespace Synthient.Edge.Models.Config.Definitions;
+namespace Synthient.Edge.Config.Definitions;
 
 public sealed class FilterDefinition : IKeyedConfigDefinition<FilterConfig>
 {

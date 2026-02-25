@@ -1,6 +1,6 @@
 ﻿using System.Collections.Frozen;
 using Microsoft.Extensions.Primitives;
-using Synthient.Edge.Models.Config;
+using Synthient.Edge.Config;
 
 namespace Synthient.Edge.Utilities;
 
