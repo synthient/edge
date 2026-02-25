@@ -4,20 +4,20 @@ using Synthient.Edge.Services;
 
 namespace Synthient.Edge.Pipeline;
 
-public sealed partial class EventSink(
+public sealed partial class BucketedEventSink(
     ChannelReader<BucketedEvent> input,
     IEventRepository repo,
     MetricsReporter metrics,
-    ILogger<EventSink> logger
+    ILogger<BucketedEventSink> logger
 ) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var bucketed in input.ReadAllAsync(stoppingToken))
+        await foreach (var bucketedEvent in input.ReadAllAsync(stoppingToken))
         {
             try
             {
-                await repo.InsertAsync(bucketed, stoppingToken);
+                await repo.InsertAsync(bucketedEvent, stoppingToken);
                 metrics.RecordProcessed();
             }
             catch (Exception ex)

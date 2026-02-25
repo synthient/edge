@@ -60,7 +60,7 @@ builder.Services.AddSingleton(bucketedEventChannel.Reader);
 
 builder.Services.AddHostedService<RedisPubSubSource>();
 builder.Services.AddHostedService<BucketFilter>();
-builder.Services.AddHostedService<EventSink>();
+builder.Services.AddHostedService<BucketedEventSink>();
 
 // Metrics
 builder.Services.AddSingleton<MetricsReporter>();
