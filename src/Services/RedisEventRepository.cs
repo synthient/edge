@@ -36,7 +36,7 @@ public sealed partial class RedisEventRepository(
 
                                         -- [count: 4B int32][timestamp: 8B int64]
                                         redis.call('HSET', bucket_key, provider_id, struct.pack('>i4i8', count, timestamp))
-                                        redis.call('HSET', ip_key, bucket_id, struct.pack('>i8', timestamp))
+                                        redis.call('SADD', ip_key, bucket_id)
 
                                         -- Set TTL on first write (NX), extend if the new expiry is later (GT).
                                         if redis.call('PEXPIREAT', bucket_key, ttl_ms, 'NX') == 0 then
@@ -109,11 +109,11 @@ public sealed partial class RedisEventRepository(
     {
         var ipKey = GetIpKey(ip);
 
-        var bucketFields = await _database.HashGetAllAsync(ipKey);
-        if (bucketFields.Length == 0)
+        var bucketIdMembers = await _database.SetMembersAsync(ipKey);
+        if (bucketIdMembers.Length == 0)
             return [];
 
-        var bucketIds = bucketFields.Select(e => (int)e.Name).ToArray();
+        var bucketIds = bucketIdMembers.Select(m => (int)m).ToArray();
         var (hashes, ttls) = await FetchAllBucketsAsync(ip, bucketIds);
 
         return await ResolveBucketResultsAsync(bucketIds, hashes, ttls, cancellationToken);
@@ -208,9 +208,9 @@ public sealed partial class RedisEventRepository(
     {
         var size = ip.AddressFamily == AddressFamily.InterNetwork ? 4 : 16;
         var key = new byte[size];
-        
+
         ip.TryWriteBytes(key, out _);
-        
+
         return key;
     }
 
