@@ -17,7 +17,7 @@
     <ItemGroup>
       <PackageReference Include="AsyncKeyedLock" Version="8.0.2" />
       <PackageReference Include="MaxMind.Db" Version="4.3.4" />
-      <PackageReference Include="StackExchange.Redis" Version="2.11.3" />
+      <PackageReference Include="StackExchange.Redis" Version="2.11.8" />
       <PackageReference Include="YamlDotNet" Version="16.3.0" />
     </ItemGroup>
 
