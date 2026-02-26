@@ -1,4 +1,6 @@
-﻿using System.Net;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Net;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Synthient.Edge.Config;
 using Synthient.Edge.Models;
@@ -18,7 +20,7 @@ public static class ContextEndpoints
             group.AddEndpointFilter<ApiKeyFilter>();
 
         group.MapGet("/{ip}", LookupIpAsync);
-        group.MapGet("/{ip}/buckets/{bucket}", LookupBucketAsync);
+        group.MapGet("/{ip}/buckets/{bucket}", LookupIpAndBucketAsync);
 
         return group;
     }
@@ -26,18 +28,18 @@ public static class ContextEndpoints
     private static async Task<IResult> LookupIpAsync(
         [FromRoute] string ip,
         [FromServices] IEventRepository repo,
-        [FromServices] IMmdbReader fileMmdbReader,
+        [FromServices] IMmdbReader mmdbReader,
         CancellationToken cancellationToken
     )
     {
-        if (!IPAddress.TryParse(ip, out var ipAddress))
-            return TypedResults.BadRequest($"'{ip}' is not a valid IP address.");
+        if (!TryParseIp(ip, out var ipAddress, out var error))
+            return error;
 
         var bucketResults = await repo.GetAllBucketsAsync(ipAddress, cancellationToken);
         if (bucketResults.Count == 0)
-            return TypedResults.NotFound();
+            return Error(HttpStatusCode.NotFound, "IP not found in any bucket");
 
-        var (network, location) = fileMmdbReader.LookupNetworkAndLocation(ipAddress);
+        var (network, location) = mmdbReader.LookupNetworkAndLocation(ipAddress);
 
         var response = new ContextIpResponse
         {
@@ -50,19 +52,19 @@ public static class ContextEndpoints
         return TypedResults.Ok(response);
     }
 
-    private static async Task<IResult> LookupBucketAsync(
+    private static async Task<IResult> LookupIpAndBucketAsync(
         [FromRoute] string ip,
         [FromRoute] string bucket,
         [FromServices] IEventRepository repo,
         CancellationToken cancellationToken
     )
     {
-        if (!IPAddress.TryParse(ip, out var ipAddress))
-            return TypedResults.BadRequest($"'{ip}' is not a valid IP address.");
+        if (!TryParseIp(ip, out var ipAddress, out var error))
+            return error;
 
         var bucketResult = await repo.GetBucketAsync(ipAddress, bucket, cancellationToken);
         if (bucketResult is null)
-            return TypedResults.NotFound();
+            return Error(HttpStatusCode.NotFound, "IP not found in bucket");
 
         var response = new ContextIpBucketResponse
         {
@@ -73,5 +75,26 @@ public static class ContextEndpoints
         };
 
         return TypedResults.Ok(response);
+    }
+
+    private static bool TryParseIp(
+        string ip,
+        [NotNullWhen(true)] out IPAddress? address,
+        [NotNullWhen(false)] out IResult? error
+    )
+    {
+        if (!IPAddress.TryParse(ip, out address))
+        {
+            error = Error(HttpStatusCode.BadRequest, "Invalid IP address, expected IPv4 or IPv6 format");
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static JsonHttpResult<MessageResponse> Error(HttpStatusCode statusCode, string message)
+    {
+        return TypedResults.Json(new MessageResponse(message), statusCode: (int)statusCode);
     }
 }
