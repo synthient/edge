@@ -1,9 +1,9 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
 using System.Net;
+using System.Net.Sockets;
 using StackExchange.Redis;
 using Synthient.Edge.Config;
 using Synthient.Edge.Models;
-using Synthient.Edge.Utilities;
 
 namespace Synthient.Edge.Services;
 
@@ -17,158 +17,212 @@ public sealed partial class RedisEventRepository(
     private readonly IDatabase _database = connection.GetDatabase(appConfig.Sink.Database);
 
     // TODO: Map IP to buckets with a set (instead of hash, we are not using the timestamp).
-    private static readonly LuaScript InsertScript = LuaScript.Prepare(
-        """
-        local current = redis.call('HGET', @bucketKey, @providerId)
-        local count   = 1
+    private const string InsertScript = """
+                                        local provider_id = ARGV[1]
+                                        local timestamp = ARGV[2]
+                                        local bucket_id = ARGV[3]
+                                        local ttl_ms = tonumber(ARGV[4])
 
-        if current then
-            -- Read count from first 4 bytes: big-endian int32
-            count = struct.unpack('>i4', current) + 1
-        end
+                                        local ip_key = KEYS[1]
+                                        local bucket_key = KEYS[1] .. struct.pack('>i4', bucket_id)
 
-        -- [count: 4B int32][timestamp: 8B int64]
-        redis.call('HSET', @bucketKey, @providerId, struct.pack('>i4l', count, @timestamp))
+                                        local current = redis.call('HGET', bucket_key, provider_id)
+                                        local count = 1
 
-        -- [timestamp: 8B int64]
-        redis.call('HSET', @ipKey, @bucketId, struct.pack('>l', @timestamp))
+                                        if current then
+                                            -- Read count from first 4 bytes.
+                                            count = struct.unpack('>i4', current) + 1
+                                        end
 
-        -- Set TTL on first write (NX), extend if the new expiry is later (GT)
-        if redis.call('PEXPIREAT', @bucketKey, @ttlMs, 'NX') == 0 then
-            redis.call('PEXPIREAT', @bucketKey, @ttlMs, 'GT')
-        end
+                                        -- [count: 4B int32][timestamp: 8B int64]
+                                        redis.call('HSET', bucket_key, provider_id, struct.pack('>i4i8', count, timestamp))
+                                        redis.call('HSET', ip_key, bucket_id, struct.pack('>i8', timestamp))
 
-        if redis.call('PEXPIREAT', @ipKey, @ttlMs, 'NX') == 0 then
-            redis.call('PEXPIREAT', @ipKey, @ttlMs, 'GT')
-        end
-        """);
+                                        -- Set TTL on first write (NX), extend if the new expiry is later (GT).
+                                        if redis.call('PEXPIREAT', bucket_key, ttl_ms, 'NX') == 0 then
+                                            redis.call('PEXPIREAT', bucket_key, ttl_ms, 'GT')
+                                        end
+
+                                        if redis.call('PEXPIREAT', ip_key, ttl_ms, 'NX') == 0 then
+                                            redis.call('PEXPIREAT', ip_key, ttl_ms, 'GT')
+                                        end
+                                        """;
 
     public async Task InsertAsync(BucketedEvent bucketedEvent, CancellationToken cancellationToken)
     {
-        var eventTime = DateTimeOffset.FromUnixTimeSeconds(bucketedEvent.Event.Timestamp);
-        var providerId = await strings.GetOrCreateIdAsync(bucketedEvent.Event.Provider, cancellationToken);
-
+        var evt = bucketedEvent.Event;
+        var providerId = await strings.GetOrCreateIdAsync(evt.Provider, cancellationToken);
+        var ipKey = GetIpKey(evt.IpAddress);
 
         for (var i = 0; i < bucketedEvent.Matches; i++)
         {
-            var (bucketName, bucket) = bucketedEvent.Buckets[i];
-
-            var ttlAt = eventTime + bucket.Ttl;
-            if (ttlAt <= DateTimeOffset.UtcNow)
-            {
-                LogExpiredEvent(logger);
-                continue;
-            }
-
-            var bucketId = await strings.GetOrCreateIdAsync(bucketName, cancellationToken);
-
-            // TODO: Writes IP to bytes twice.
-            var ipKey = RedisKeyBuilder.IpKey(bucketedEvent.Event.IpAddress);
-            var bucketKey = RedisKeyBuilder.BucketKey(bucketedEvent.Event.IpAddress, bucketId);
-
-            // TODO: Swallows errors.
-            _ = await _database.ScriptEvaluateAsync(
-                InsertScript,
-                new
-                {
-                    bucketKey = bucketKey,
-                    ipKey = ipKey,
-                    providerId = (RedisValue)providerId,
-                    bucketId = (RedisValue)bucketId,
-                    ttlMs = ttlAt.ToUnixTimeMilliseconds(),
-                    timestamp = bucketedEvent.Event.Timestamp
-                },
-                flags: CommandFlags.FireAndForget
-            );
+            var bucket = bucketedEvent.Buckets[i];
+            await InsertBucketAsync(evt, providerId, ipKey, bucket, cancellationToken);
         }
     }
 
+    private async Task InsertBucketAsync(
+        ProxyEvent evt,
+        int providerId,
+        RedisKey ipKey,
+        BucketMatch match,
+        CancellationToken cancellationToken
+    )
+    {
+        var eventTime = DateTimeOffset.FromUnixTimeSeconds(evt.Timestamp);
+        var ttlAt = eventTime + match.Bucket.Ttl;
+
+        if (ttlAt <= DateTimeOffset.UtcNow)
+        {
+            LogExpiredEvent(logger);
+            return;
+        }
+
+        var bucketId = await strings.GetOrCreateIdAsync(match.Name, cancellationToken);
+
+        await _database.ScriptEvaluateAsync(
+            InsertScript,
+            keys: [ipKey],
+            values: [providerId, evt.Timestamp, bucketId, ttlAt.ToUnixTimeMilliseconds()],
+            flags: CommandFlags.FireAndForget
+        );
+    }
+
+
     public async Task<BucketResult?> GetBucketAsync(
-        IPAddress ip,
+        IPAddress ipAddress,
         string bucketName,
         CancellationToken cancellationToken
     )
     {
         var bucketId = await strings.GetOrCreateIdAsync(bucketName, cancellationToken);
-        var key = RedisKeyBuilder.BucketKey(ip, bucketId);
 
-        var (ttl, entries) = await FetchBucketAsync(key);
+        var (ttl, entries) = await FetchBucketAsync(ipAddress, bucketId);
         if (entries.Length == 0)
             return null;
 
-        var providersActivity = await ResolveProvidersAsync(entries, cancellationToken);
-
-        return new BucketResult(bucketName, ttl, providersActivity);
+        var providerEntries = await ResolveProvidersAsync(entries, cancellationToken);
+        return new BucketResult(bucketName, ttl, providerEntries);
     }
 
     public async Task<IReadOnlyList<BucketResult>> GetAllBucketsAsync(IPAddress ip, CancellationToken cancellationToken)
     {
-        var ipKey = RedisKeyBuilder.IpKey(ip);
+        var ipKey = GetIpKey(ip);
+
         var bucketFields = await _database.HashGetAllAsync(ipKey);
         if (bucketFields.Length == 0)
             return [];
 
         var bucketIds = bucketFields.Select(e => (int)e.Name).ToArray();
-        var bucketKeys = bucketIds.Select(bucketId => RedisKeyBuilder.BucketKey(ip, bucketId)).ToArray();
+        var (hashes, ttls) = await FetchAllBucketsAsync(ip, bucketIds);
 
-        // Pipeline all HGETALL + TTL lookups
-        var batch = _database.CreateBatch();
-        var hashTasks = bucketKeys.Select(k => batch.HashGetAllAsync(k)).ToArray();
-        var ttlTasks = bucketKeys.Select(k => batch.KeyTimeToLiveAsync(k)).ToArray();
-        batch.Execute();
+        return await ResolveBucketResultsAsync(bucketIds, hashes, ttls, cancellationToken);
+    }
 
-        await Task.WhenAll(hashTasks);
-        await Task.WhenAll(ttlTasks);
+    private async Task<(HashEntry[][] Hashes, TimeSpan?[] Ttls)> FetchAllBucketsAsync(
+        IPAddress ipAddress,
+        int[] bucketIds
+    )
+    {
+        var ipBucketKeys = bucketIds.Select(id => GetIpBucketKey(ipAddress, id)).ToArray();
 
-        var bucketNames =
-            await Task.WhenAll(bucketIds.Select(id => strings.GetStringAsync(id, cancellationToken).AsTask()));
+        var hashTasks = ipBucketKeys.Select(k => _database.HashGetAllAsync(k)).ToArray();
+        var ttlTasks = ipBucketKeys.Select(k => _database.KeyTimeToLiveAsync(k)).ToArray();
 
+        return (await Task.WhenAll(hashTasks), await Task.WhenAll(ttlTasks));
+    }
+
+    private async Task<(TimeSpan? Ttl, HashEntry[] Entries)> FetchBucketAsync(IPAddress ipAddress, int bucketId)
+    {
+        var ipBucketKey = GetIpBucketKey(ipAddress, bucketId);
+
+        var ttlTask = _database.KeyTimeToLiveAsync(ipBucketKey);
+        var entriesTask = _database.HashGetAllAsync(ipBucketKey);
+        await Task.WhenAll(ttlTask, entriesTask);
+
+        return (ttlTask.Result, entriesTask.Result);
+    }
+
+    private async Task<IReadOnlyList<BucketResult>> ResolveBucketResultsAsync(
+        int[] bucketIds,
+        HashEntry[][] hashes,
+        TimeSpan?[] ttls,
+        CancellationToken cancellationToken)
+    {
         var results = new List<BucketResult>(bucketIds.Length);
 
         for (var i = 0; i < bucketIds.Length; i++)
         {
-            if (hashTasks[i].Result.Length == 0)
+            if (hashes[i].Length == 0)
                 continue;
 
-            results.Add(new BucketResult(
-                Bucket: bucketNames[i],
-                Ttl: ttlTasks[i].Result,
-                Providers: await ResolveProvidersAsync(hashTasks[i].Result, cancellationToken)
-            ));
+            var bucketName = await strings.GetStringAsync(bucketIds[i], cancellationToken);
+            var providers = await ResolveProvidersAsync(hashes[i], cancellationToken);
+
+            results.Add(new BucketResult(bucketName, ttls[i], providers));
         }
 
         return results;
     }
 
-    private async Task<(TimeSpan? Ttl, HashEntry[] Entries)> FetchBucketAsync(RedisKey key)
-    {
-        var ttlTask = _database.KeyTimeToLiveAsync(key);
-        var entriesTask = _database.HashGetAllAsync(key);
-        await Task.WhenAll(ttlTask, entriesTask);
-        return (ttlTask.Result, entriesTask.Result);
-    }
-
     private async ValueTask<IReadOnlyList<ProviderActivity>> ResolveProvidersAsync(
         HashEntry[] entries,
-        CancellationToken cancellationToken
-    )
+        CancellationToken cancellationToken)
     {
         var result = new List<ProviderActivity>(entries.Length);
 
         foreach (var entry in entries)
         {
-            var name = await strings.GetStringAsync((int)entry.Name, cancellationToken);
-            var bytes = (byte[])entry.Value!;
-
-            var count = BinaryPrimitives.ReadInt32BigEndian(bytes);
-            var ts = BinaryPrimitives.ReadInt64BigEndian(bytes.AsSpan(sizeof(int)));
-            var lastSeen = DateTimeOffset.FromUnixTimeSeconds(ts).UtcDateTime;
-
-            var providerActivity = new ProviderActivity(name, count, lastSeen);
-            result.Add(providerActivity);
+            var provider = await ParseProviderAsync(entry, cancellationToken);
+            result.Add(provider);
         }
 
         return result;
+    }
+
+    private async ValueTask<ProviderActivity> ParseProviderAsync(HashEntry entry, CancellationToken cancellationToken)
+    {
+        if (!entry.Name.TryParse(out int providerId))
+            throw new InvalidDataException("Unexpected Redis hash key type.");
+
+        if (entry.Value.IsNullOrEmpty)
+            throw new InvalidDataException("Redis hash value is null or empty.");
+
+        var bytes = (byte[])entry.Value!;
+
+        const int payloadSize = sizeof(int) + sizeof(long);
+
+        if (bytes.Length != payloadSize)
+            throw new InvalidDataException($"Expected {payloadSize} bytes, got {bytes.Length}.");
+
+        var count = BinaryPrimitives.ReadInt32BigEndian(bytes);
+        var lastSeen = DateTimeOffset
+            .FromUnixTimeSeconds(BinaryPrimitives.ReadInt64BigEndian(bytes.AsSpan(sizeof(int))))
+            .UtcDateTime;
+
+        var providerName = await strings.GetStringAsync(providerId, cancellationToken);
+        return new ProviderActivity(providerName, count, lastSeen);
+    }
+
+    private static RedisKey GetIpKey(IPAddress ip)
+    {
+        var size = ip.AddressFamily == AddressFamily.InterNetwork ? 4 : 16;
+        var key = new byte[size];
+        
+        ip.TryWriteBytes(key, out _);
+        
+        return key;
+    }
+
+    private static RedisKey GetIpBucketKey(IPAddress ip, int bucketId)
+    {
+        var ipSize = ip.AddressFamily == AddressFamily.InterNetwork ? 4 : 16;
+        var key = new byte[ipSize + sizeof(int)];
+
+        ip.TryWriteBytes(key, out _);
+        BinaryPrimitives.WriteInt32BigEndian(key.AsSpan(ipSize), bucketId);
+
+        return key;
     }
 
     [LoggerMessage(LogLevel.Debug, "Skipping inserting expired event.")]

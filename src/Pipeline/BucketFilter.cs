@@ -16,21 +16,30 @@ public sealed class BucketFilter(
     MetricsReporter metrics
 ) : BackgroundService
 {
-    private readonly bool _requiresMmdb = appConfig.FiltersRequireMmdb;
     private readonly int _bucketsCount = appConfig.Buckets.Count;
+    private readonly long _maxBucketTtlMs = (long)appConfig.MaxBucketTtl.TotalMilliseconds;
     private readonly FrozenDictionary<string, BucketConfig> _buckets = appConfig.Buckets;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var requiresMmdb = appConfig.FiltersRequireMmdb;
+
         try
         {
             await foreach (var evt in input.ReadAllAsync(stoppingToken))
             {
-                var mmdbData = _requiresMmdb
+                var eventAgeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - evt.Timestamp * 1000;
+                if (eventAgeMs >= _maxBucketTtlMs)
+                {
+                    metrics.RecordExpired();
+                    continue;
+                }
+
+                var mmdbData = requiresMmdb
                     ? mmdbReader.Lookup(evt.IpAddress)
                     : null;
 
-                if (!TryMatchBuckets(evt, mmdbData, out var matched, out var matches))
+                if (!TryMatchBuckets(evt, mmdbData, eventAgeMs, out var matched, out var matches))
                 {
                     metrics.RecordUnmatched();
                     continue;
@@ -49,6 +58,7 @@ public sealed class BucketFilter(
     private bool TryMatchBuckets(
         ProxyEvent evt,
         MmdbData? mmdb,
+        long eventAgeMs,
         [NotNullWhen(true)] out BucketMatch[]? matched,
         out int matches
     )
@@ -57,8 +67,13 @@ public sealed class BucketFilter(
         matches = 0;
 
         foreach (var (name, bucket) in _buckets)
+        {
+            if (eventAgeMs >= bucket.Ttl.TotalMilliseconds)
+                continue;
+
             if (bucket.Matches(evt, mmdb))
                 buffer[matches++] = new BucketMatch(name, bucket);
+        }
 
         if (matches == 0)
         {

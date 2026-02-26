@@ -1,4 +1,4 @@
-﻿using System.Threading.Channels;
+using System.Threading.Channels;
 using StackExchange.Redis;
 using Synthient.Edge.Config;
 using Synthient.Edge.Models;
@@ -87,7 +87,7 @@ public sealed partial class RedisPubSubSource(
         metrics.RecordIngested();
 
         if (!output.TryWrite(evt))
-            metrics.RecordDropped();
+            metrics.RecordOverflow();
     }
 
     private static ConfigurationOptions BuildRedisConfiguration(RedisSourceConfig config) => new()

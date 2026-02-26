@@ -12,4 +12,5 @@ public sealed record AppConfig(
 )
 {
     public bool FiltersRequireMmdb { get; } = Buckets.Values.Any(bucket => bucket.FiltersRequireMmdb);
+    public TimeSpan MaxBucketTtl { get; } = Buckets.Values.Max(bucket => bucket.Ttl);
 }
