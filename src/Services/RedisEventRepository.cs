@@ -7,87 +7,86 @@ using Synthient.Edge.Models;
 
 namespace Synthient.Edge.Services;
 
-public sealed partial class RedisEventRepository(
+public sealed class RedisEventRepository(
     AppConfig appConfig,
     IConnectionMultiplexer connection,
-    IStringRegistry strings,
-    ILogger<RedisEventRepository> logger
+    IStringRegistry strings
 ) : IEventRepository
 {
     private readonly IDatabase _database = connection.GetDatabase(appConfig.Sink.Database);
 
-    // TODO: Map IP to buckets with a set (instead of hash, we are not using the timestamp).
     private const string InsertScript = """
-                                        local provider_id = ARGV[1]
-                                        local timestamp = ARGV[2]
-                                        local bucket_id = ARGV[3]
-                                        local ttl_ms = tonumber(ARGV[4])
-
                                         local ip_key = KEYS[1]
-                                        local bucket_key = KEYS[1] .. struct.pack('>i4', bucket_id)
 
-                                        local current = redis.call('HGET', bucket_key, provider_id)
-                                        local count = 1
+                                        local provider_id = ARGV[1]
+                                        local timestamp = tonumber(ARGV[2])
 
-                                        if current then
-                                            -- Read count from first 4 bytes.
-                                            count = struct.unpack('>i4', current) + 1
+                                        local max_ttl = 0
+
+                                        for i = 3, #ARGV, 2 do
+                                            local bucket_id = tonumber(ARGV[i])
+                                            local ttl_ms = tonumber(ARGV[i + 1])
+                                            
+                                            if ttl_ms > max_ttl then 
+                                                max_ttl = ttl_ms 
+                                            end
+                                            
+                                            local bucket_key = ip_key .. struct.pack('>i4', bucket_id)
+
+                                            local current = redis.call('HGET', bucket_key, provider_id)
+                                            local count = current and struct.unpack('>i4', current) + 1 or 1
+
+                                            -- [count: 4B int32][timestamp: 8B int64]
+                                            redis.call('HSET', bucket_key, provider_id, struct.pack('>i4i8', count, timestamp))
+                                            redis.call('SADD', ip_key, bucket_id)
+
+                                            -- Set TTL on first write (NX), extend if the new expiry is later (GT).
+                                            if redis.call('PEXPIREAT', bucket_key, ttl_ms, 'NX') == 0 then
+                                                redis.call('PEXPIREAT', bucket_key, ttl_ms, 'GT')
+                                            end
                                         end
 
-                                        -- [count: 4B int32][timestamp: 8B int64]
-                                        redis.call('HSET', bucket_key, provider_id, struct.pack('>i4i8', count, timestamp))
-                                        redis.call('SADD', ip_key, bucket_id)
-
-                                        -- Set TTL on first write (NX), extend if the new expiry is later (GT).
-                                        if redis.call('PEXPIREAT', bucket_key, ttl_ms, 'NX') == 0 then
-                                            redis.call('PEXPIREAT', bucket_key, ttl_ms, 'GT')
-                                        end
-
-                                        if redis.call('PEXPIREAT', ip_key, ttl_ms, 'NX') == 0 then
-                                            redis.call('PEXPIREAT', ip_key, ttl_ms, 'GT')
+                                        if redis.call('PEXPIREAT', ip_key, max_ttl, 'NX') == 0 then
+                                            redis.call('PEXPIREAT', ip_key, max_ttl, 'GT')
                                         end
                                         """;
 
     public async Task InsertAsync(BucketedEvent bucketedEvent, CancellationToken cancellationToken)
     {
+        if (bucketedEvent.Matches == 0)
+            return;
+
         var evt = bucketedEvent.Event;
+        var eventTime = DateTimeOffset.FromUnixTimeSeconds(evt.Timestamp);
         var providerId = await strings.GetOrCreateIdAsync(evt.Provider, cancellationToken);
-        var ipKey = GetIpKey(evt.IpAddress);
+
+        var values = new RedisValue[2 + bucketedEvent.Matches * 2];
+        values[0] = providerId;
+        values[1] = evt.Timestamp;
 
         for (var i = 0; i < bucketedEvent.Matches; i++)
         {
-            var bucket = bucketedEvent.Buckets[i];
-            await InsertBucketAsync(evt, providerId, ipKey, bucket, cancellationToken);
-        }
-    }
+            var match = bucketedEvent.Buckets[i];
 
-    private async Task InsertBucketAsync(
-        ProxyEvent evt,
-        int providerId,
-        RedisKey ipKey,
-        BucketMatch match,
-        CancellationToken cancellationToken
-    )
-    {
-        var eventTime = DateTimeOffset.FromUnixTimeSeconds(evt.Timestamp);
-        var ttlAt = eventTime + match.Bucket.Ttl;
+            var ttlAt = eventTime + match.Bucket.Ttl;
+            if (ttlAt <= DateTimeOffset.UtcNow)
+                continue;
 
-        if (ttlAt <= DateTimeOffset.UtcNow)
-        {
-            LogExpiredEvent(logger);
-            return;
+            var bucketId = await strings.GetOrCreateIdAsync(match.Name, cancellationToken);
+
+            values[2 + i * 2] = bucketId;
+            values[2 + i * 2 + 1] = ttlAt.ToUnixTimeMilliseconds();
         }
 
-        var bucketId = await strings.GetOrCreateIdAsync(match.Name, cancellationToken);
+        var ipKey = GetIpKey(evt.IpAddress);
 
         await _database.ScriptEvaluateAsync(
             InsertScript,
             keys: [ipKey],
-            values: [providerId, evt.Timestamp, bucketId, ttlAt.ToUnixTimeMilliseconds()],
+            values: values,
             flags: CommandFlags.FireAndForget
         );
     }
-
 
     public async Task<BucketResult?> GetBucketAsync(
         IPAddress ipAddress,
@@ -224,7 +223,4 @@ public sealed partial class RedisEventRepository(
 
         return key;
     }
-
-    [LoggerMessage(LogLevel.Debug, "Skipping inserting expired event.")]
-    private static partial void LogExpiredEvent(ILogger logger);
 }
