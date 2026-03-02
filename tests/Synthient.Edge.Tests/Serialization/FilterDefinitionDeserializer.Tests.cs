@@ -1,6 +1,7 @@
 using Synthient.Edge.Config.Definitions;
 using Synthient.Edge.Serialization;
 using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 using YamlDotNet.Serialization.NodeDeserializers;
 
 namespace Synthient.Edge.Tests.Serialization;
@@ -10,6 +11,7 @@ namespace Synthient.Edge.Tests.Serialization;
 public sealed class FilterDefinitionDeserializerTests
 {
     private static readonly IDeserializer Deserializer = new DeserializerBuilder()
+        .WithNamingConvention(UnderscoredNamingConvention.Instance)
         .WithNodeDeserializer(
             inner => new FilterDefinitionDeserializer(inner),
             s => s.InsteadOf<ObjectNodeDeserializer>()
@@ -42,5 +44,17 @@ public sealed class FilterDefinitionDeserializerTests
     {
         var result = Deserializer.Deserialize<FilterDefinition>("mmdb.country.iso_code:\n  - US\n  - CA");
         Assert.That(result.MmdbFilters["mmdb.country.iso_code"], Is.EqualTo(["US", "CA"]));
+    }
+
+    [Test]
+    public void Deserialize_WithNonFilterDefinitionType_DelegatesToInner()
+    {
+        var result = Deserializer.Deserialize<OtherType>("name: test");
+        Assert.That(result.Name, Is.EqualTo("test"));
+    }
+
+    private sealed class OtherType
+    {
+        public string? Name { get; set; }
     }
 }
