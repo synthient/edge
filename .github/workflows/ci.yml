@@ -8,10 +8,12 @@ on:
     branches: ["main"]
     paths-ignore:
       - "**/*.md"
+      - "**/*.y*ml"
   pull_request:
     branches: ["main"]
     paths-ignore:
       - "**/*.md"
+      - "**/*.y*ml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
