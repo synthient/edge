@@ -9,34 +9,35 @@ namespace Synthient.Edge.Tests.Config.Definitions;
 [TestOf(typeof(FilterDefinition))]
 public sealed class FilterDefinitionTests
 {
-    private static readonly ProxyEvent CloudflareEvent = new(IPAddress.Loopback, "cloudflare", 0L);
+    private const string Provider = "provider1";
+    private static readonly ProxyEvent ProxyEvent = new(IPAddress.Loopback, Provider, DateTimeOffset.UtcNow);
 
     [Test]
     public void Build_WithNoFilters_PassesAllEvents()
     {
         var config = new FilterDefinition().Build("test");
-        Assert.That(config.Matches(CloudflareEvent, null), Is.True);
+        Assert.That(config.Matches(ProxyEvent, null), Is.True);
     }
 
     [Test]
     public void Build_WithMatchingProvider_Passes()
     {
-        var config = new FilterDefinition { Provider = ["cloudflare"] }.Build("test");
-        Assert.That(config.Matches(CloudflareEvent, null), Is.True);
+        var config = new FilterDefinition { Provider = [Provider] }.Build("test");
+        Assert.That(config.Matches(ProxyEvent, null), Is.True);
     }
 
     [Test]
     public void Build_WithProviderFilter_IsCaseInsensitive()
     {
-        var config = new FilterDefinition { Provider = ["CLOUDFLARE"] }.Build("test");
-        Assert.That(config.Matches(CloudflareEvent, null), Is.True);
+        var config = new FilterDefinition { Provider = [Provider.ToUpper()] }.Build("test");
+        Assert.That(config.Matches(ProxyEvent, null), Is.True);
     }
 
     [Test]
     public void Build_WithNonMatchingProvider_Rejects()
     {
-        var config = new FilterDefinition { Provider = ["fastly"] }.Build("test");
-        Assert.That(config.Matches(CloudflareEvent, null), Is.False);
+        var config = new FilterDefinition { Provider = ["provider2"] }.Build("test");
+        Assert.That(config.Matches(ProxyEvent, null), Is.False);
     }
 
     [Test]
@@ -50,8 +51,9 @@ public sealed class FilterDefinitionTests
 
     [Test]
     public void Build_WithValidMmdbKey_DoesNotThrow() =>
-        Assert.DoesNotThrow(
-            () => new FilterDefinition { MmdbFilters = { ["mmdb.country.iso_code"] = ["US"] } }.Build("test"));
+        Assert.DoesNotThrow(() =>
+            new FilterDefinition { MmdbFilters = { ["mmdb.country.iso_code"] = ["US"] } }.Build("test")
+        );
 
     [Test]
     public void RequiresMmdb_WhenMmdbFilterPresent_IsTrue()
@@ -63,7 +65,7 @@ public sealed class FilterDefinitionTests
     [Test]
     public void RequiresMmdb_WhenOnlyProviderFilter_IsFalse()
     {
-        var config = new FilterDefinition { Provider = ["cloudflare"] }.Build("test");
+        var config = new FilterDefinition { Provider = [Provider] }.Build("test");
         Assert.That(config.RequiresMmdb, Is.False);
     }
 }

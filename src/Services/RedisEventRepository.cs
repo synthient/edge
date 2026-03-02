@@ -19,11 +19,14 @@ public sealed class RedisEventRepository(
                                         local ip_key = KEYS[1]
 
                                         local provider_id = ARGV[1]
-                                        local timestamp = tonumber(ARGV[2])
+                                        local timestamp_sec = tonumber(ARGV[2])
+
+                                        local match_count = tonumber(ARGV[3])
+                                        local stop_idx = 3 + (match_count * 2)
 
                                         local max_ttl = 0
 
-                                        for i = 3, #ARGV, 2 do
+                                        for i = 4, stop_idx, 2 do
                                             local bucket_id = tonumber(ARGV[i])
                                             local ttl_ms = tonumber(ARGV[i + 1])
                                             
@@ -37,7 +40,7 @@ public sealed class RedisEventRepository(
                                             local count = current and struct.unpack('>i4', current) + 1 or 1
 
                                             -- [count: 4B int32][timestamp: 8B int64]
-                                            redis.call('HSET', bucket_key, provider_id, struct.pack('>i4i8', count, timestamp))
+                                            redis.call('HSET', bucket_key, provider_id, struct.pack('>i4i8', count, timestamp_sec))
                                             redis.call('SADD', ip_key, bucket_id)
 
                                             -- Set TTL on first write (NX), extend if the new expiry is later (GT).
@@ -56,34 +59,43 @@ public sealed class RedisEventRepository(
         if (bucketedEvent.Matches == 0)
             return;
 
+        var now = DateTimeOffset.UtcNow;
         var evt = bucketedEvent.Event;
-        var eventTime = DateTimeOffset.FromUnixTimeSeconds(evt.Timestamp);
         var providerId = await strings.GetOrCreateIdAsync(evt.Provider, cancellationToken);
 
-        var values = new RedisValue[2 + bucketedEvent.Matches * 2];
-        values[0] = providerId;
-        values[1] = evt.Timestamp;
+        var args = new RedisValue[3 + bucketedEvent.Matches * 2];
+        args[0] = providerId;
+        args[1] = evt.Timestamp.ToUnixTimeSeconds();
+        // args[2] reserved for valid match count.
 
+        var validMatches = 0;
         for (var i = 0; i < bucketedEvent.Matches; i++)
         {
             var match = bucketedEvent.Buckets[i];
 
-            var ttlAt = eventTime + match.Bucket.Ttl;
-            if (ttlAt <= DateTimeOffset.UtcNow)
+            var ttlAt = evt.Timestamp + match.Bucket.Ttl;
+            if (ttlAt <= now)
                 continue;
 
             var bucketId = await strings.GetOrCreateIdAsync(match.Name, cancellationToken);
 
-            values[2 + i * 2] = bucketId;
-            values[2 + i * 2 + 1] = ttlAt.ToUnixTimeMilliseconds();
+            var offset = 3 + validMatches * 2;
+            args[offset] = bucketId;
+            args[offset + 1] = ttlAt.ToUnixTimeMilliseconds();
+            validMatches++;
         }
 
+        if (validMatches == 0)
+            return;
+
+        args[2] = validMatches;
+        
         var ipKey = GetIpKey(evt.IpAddress);
 
         await _database.ScriptEvaluateAsync(
             InsertScript,
             keys: [ipKey],
-            values: values,
+            values: args,
             flags: CommandFlags.FireAndForget
         );
     }
@@ -195,9 +207,9 @@ public sealed class RedisEventRepository(
             throw new InvalidDataException($"Expected {payloadSize} bytes, got {bytes.Length}.");
 
         var count = BinaryPrimitives.ReadInt32BigEndian(bytes);
-        var lastSeen = DateTimeOffset
-            .FromUnixTimeSeconds(BinaryPrimitives.ReadInt64BigEndian(bytes.AsSpan(sizeof(int))))
-            .UtcDateTime;
+
+        var timestamp = BinaryPrimitives.ReadInt64BigEndian(bytes.AsSpan(sizeof(int)));
+        var lastSeen = DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime;
 
         var providerName = await strings.GetStringAsync(providerId, cancellationToken);
         return new ProviderActivity(providerName, count, lastSeen);

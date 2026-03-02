@@ -10,7 +10,7 @@ namespace Synthient.Edge.Tests.Config;
 [TestOf(typeof(FilterConfig))]
 public sealed class FilterConfigTests
 {
-    private static readonly ProxyEvent Event = new(IPAddress.Loopback, "provider", 0L);
+    private static readonly ProxyEvent Event = new(IPAddress.Loopback, "provider", DateTimeOffset.UtcNow);
 
     private static FilterConfig MmdbFilter(string key, params string[] values) =>
         new FilterDefinition { MmdbFilters = { [key] = [..values] } }.Build("test");
@@ -96,7 +96,7 @@ public sealed class FilterConfigTests
             MmdbFilters = { ["mmdb.country.iso_code"] = ["US"] }
         }.Build("test");
 
-        var evt = new ProxyEvent(IPAddress.Loopback, providerName, 0L);
+        var evt = new ProxyEvent(IPAddress.Loopback, providerName, DateTimeOffset.UtcNow);
 
         var usMmdb = new MmdbData { ["country"] = new MmdbData { ["iso_code"] = "US" } };
         var frMmdb = new MmdbData { ["country"] = new MmdbData { ["iso_code"] = "FR" } };

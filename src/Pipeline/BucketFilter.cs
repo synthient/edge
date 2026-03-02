@@ -17,7 +17,7 @@ public sealed class BucketFilter(
 ) : BackgroundService
 {
     private readonly int _bucketsCount = appConfig.Buckets.Count;
-    private readonly long _maxBucketTtlMs = (long)appConfig.MaxBucketTtl.TotalMilliseconds;
+    private readonly TimeSpan _maxBucketTtlMs = appConfig.MaxBucketTtl;
     private readonly FrozenDictionary<string, BucketConfig> _buckets = appConfig.Buckets;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,8 +28,8 @@ public sealed class BucketFilter(
         {
             await foreach (var evt in input.ReadAllAsync(stoppingToken))
             {
-                var eventAgeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - evt.Timestamp * 1000;
-                if (eventAgeMs >= _maxBucketTtlMs)
+                var eventAge = DateTimeOffset.UtcNow - evt.Timestamp;
+                if (eventAge >= _maxBucketTtlMs)
                 {
                     metrics.RecordExpired();
                     continue;
@@ -39,7 +39,7 @@ public sealed class BucketFilter(
                     ? mmdbReader.Lookup(evt.IpAddress)
                     : null;
 
-                if (!TryMatchBuckets(evt, mmdbData, eventAgeMs, out var matched, out var matches))
+                if (!TryMatchBuckets(evt, mmdbData, eventAge, out var matched, out var matches))
                 {
                     metrics.RecordUnmatched();
                     continue;
@@ -58,7 +58,7 @@ public sealed class BucketFilter(
     private bool TryMatchBuckets(
         ProxyEvent evt,
         MmdbData? mmdb,
-        long eventAgeMs,
+        TimeSpan eventAge,
         [NotNullWhen(true)] out BucketMatch[]? matched,
         out int matches
     )
@@ -68,7 +68,7 @@ public sealed class BucketFilter(
 
         foreach (var (name, bucket) in _buckets)
         {
-            if (eventAgeMs >= bucket.Ttl.TotalMilliseconds)
+            if (eventAge >= bucket.Ttl)
                 continue;
 
             if (bucket.Matches(evt, mmdb))

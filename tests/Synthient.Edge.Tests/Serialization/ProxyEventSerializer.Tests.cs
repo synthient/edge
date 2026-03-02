@@ -6,11 +6,8 @@ namespace Synthient.Edge.Tests.Serialization;
 [TestOf(typeof(ProxyEventSerializer))]
 public sealed class ProxyEventSerializerTests
 {
-    private const string Provider = "provider1";
-    private const long Timestamp = 1234567890L;
-
-    private static readonly string ValidJson =
-        $"{{\"ip\":\"127.0.0.1\",\"provider\":\"{Provider}\",\"timestamp\":{Timestamp}}}";
+    private static readonly DateTimeOffset Timestamp = DateTimeOffset.FromUnixTimeSeconds(1234567890);
+    private const string ValidJson = "{\"ip\":\"127.0.0.1\",\"provider\":\"provider1\",\"timestamp\":1234567890}";
 
     [Test]
     public void TryDeserialize_WithValidJson_ReturnsTrueWithEvent()
@@ -21,7 +18,7 @@ public sealed class ProxyEventSerializerTests
         {
             Assert.That(result, Is.True);
             Assert.That(evt, Is.Not.Null);
-            Assert.That(evt.Provider, Is.EqualTo(Provider));
+            Assert.That(evt.Provider, Is.EqualTo("provider1"));
             Assert.That(evt.Timestamp, Is.EqualTo(Timestamp));
         }
     }

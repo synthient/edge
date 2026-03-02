@@ -11,8 +11,9 @@ namespace Synthient.Edge.Tests.Config.Definitions;
 [TestOf(typeof(BucketDefinition))]
 public sealed class BucketDefinitionTests
 {
-    private static readonly ProxyEvent CloudflareEvent = new(IPAddress.Loopback, "cloudflare", 0L);
-    private static readonly ProxyEvent FastlyEvent = new(IPAddress.Loopback, "fastly", 0L);
+    private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
+    private static readonly ProxyEvent Event1 = new(IPAddress.Loopback, "provider1", Now);
+    private static readonly ProxyEvent Event2 = new(IPAddress.Loopback, "provider2", Now);
     private static readonly Dictionary<string, FilterConfig> EmptyFilters = new();
 
     private static FilterConfig ProviderFilter(string provider) => new(
@@ -50,13 +51,12 @@ public sealed class BucketDefinitionTests
     {
         var filters = new Dictionary<string, FilterConfig>
         {
-            ["cf"] = ProviderFilter("cloudflare"),
-            ["ff"] = ProviderFilter("fastly")
+            ["p1"] = ProviderFilter("provider1"),
+            ["p2"] = ProviderFilter("provider2")
         };
-        var config = new BucketDefinition { Ttl = "00:05:00", All = ["cf", "ff"] }.Build("bucket", filters);
+        var config = new BucketDefinition { Ttl = "00:05:00", All = ["p1", "p2"] }.Build("bucket", filters);
 
-        // CloudflareEvent matches "cf" but not "ff"
-        Assert.That(config.Matches(CloudflareEvent, null), Is.False);
+        Assert.That(config.Matches(Event1, null), Is.False);
     }
 
     [Test]
@@ -64,28 +64,28 @@ public sealed class BucketDefinitionTests
     {
         var filters = new Dictionary<string, FilterConfig>
         {
-            ["cf"] = ProviderFilter("cloudflare"),
-            ["ff"] = ProviderFilter("fastly")
+            ["p1"] = ProviderFilter(Event1.Provider),
+            ["p2"] = ProviderFilter(Event2.Provider)
         };
-        var config = new BucketDefinition { Ttl = "00:05:00", Any = ["cf", "ff"] }.Build("bucket", filters);
+        var config = new BucketDefinition { Ttl = "00:05:00", Any = ["p1", "p2"] }.Build("bucket", filters);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(config.Matches(CloudflareEvent, null), Is.True);
-            Assert.That(config.Matches(FastlyEvent, null), Is.True);
+            Assert.That(config.Matches(Event1, null), Is.True);
+            Assert.That(config.Matches(Event2, null), Is.True);
         }
     }
 
     [Test]
     public void Build_WithNotFilter_ExcludesMatchingEvents()
     {
-        var filters = new Dictionary<string, FilterConfig> { ["cf"] = ProviderFilter("cloudflare") };
-        var config = new BucketDefinition { Ttl = "00:05:00", Not = ["cf"] }.Build("bucket", filters);
+        var filters = new Dictionary<string, FilterConfig> { ["p1"] = ProviderFilter(Event1.Provider) };
+        var config = new BucketDefinition { Ttl = "00:05:00", Not = ["p1"] }.Build(Event2.Provider, filters);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(config.Matches(CloudflareEvent, null), Is.False);
-            Assert.That(config.Matches(FastlyEvent, null), Is.True);
+            Assert.That(config.Matches(Event1, null), Is.False);
+            Assert.That(config.Matches(Event2, null), Is.True);
         }
     }
 
@@ -103,8 +103,8 @@ public sealed class BucketDefinitionTests
     [Test]
     public void FiltersRequireMmdb_WhenNoMmdbFiltersReferenced_IsFalse()
     {
-        var filters = new Dictionary<string, FilterConfig> { ["cf"] = ProviderFilter("cloudflare") };
-        var config = new BucketDefinition { Ttl = "00:05:00", All = ["cf"] }.Build("bucket", filters);
+        var filters = new Dictionary<string, FilterConfig> { ["p1"] = ProviderFilter("provider1") };
+        var config = new BucketDefinition { Ttl = "00:05:00", All = ["p1"] }.Build("bucket", filters);
 
         Assert.That(config.FiltersRequireMmdb, Is.False);
     }
