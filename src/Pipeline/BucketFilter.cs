@@ -39,13 +39,13 @@ public sealed class BucketFilter(
                     ? mmdbReader.Lookup(evt.IpAddress)
                     : null;
 
-                if (!TryMatchBuckets(evt, mmdbData, eventAge, out var matched, out var matches))
+                if (!TryMatchBuckets(evt, mmdbData, eventAge, out var matched, out var matchCount))
                 {
                     metrics.RecordUnmatched();
                     continue;
                 }
 
-                var bucketedEvent = new BucketedEvent(evt, matched, matches);
+                var bucketedEvent = new BucketedEvent(evt, matched, matchCount);
                 await output.WriteAsync(bucketedEvent, stoppingToken);
             }
         }
@@ -60,11 +60,11 @@ public sealed class BucketFilter(
         MmdbData? mmdb,
         TimeSpan eventAge,
         [NotNullWhen(true)] out BucketMatch[]? matched,
-        out int matches
+        out int matchCount
     )
     {
-        var buffer = BucketedEvent.RentFromPool(_bucketsCount);
-        matches = 0;
+        var matches = new BucketMatch[_bucketsCount];
+        matchCount = 0;
 
         foreach (var (name, bucket) in _buckets)
         {
@@ -72,17 +72,17 @@ public sealed class BucketFilter(
                 continue;
 
             if (bucket.Matches(evt, mmdb))
-                buffer[matches++] = new BucketMatch(name, bucket);
+                matches[matchCount++] = new BucketMatch(name, bucket);
         }
 
-        if (matches == 0)
+        if (matchCount == 0)
         {
-            ArrayPool<BucketMatch>.Shared.Return(buffer);
             matched = null;
             return false;
         }
 
-        matched = buffer;
+        // Intentionally not resizing matches array to avoid extra allocation.
+        matched = matches;
         return true;
     }
 }

@@ -56,22 +56,22 @@ public sealed class RedisEventRepository(
 
     public async Task InsertAsync(BucketedEvent bucketedEvent, CancellationToken cancellationToken)
     {
-        if (bucketedEvent.Matches == 0)
+        if (bucketedEvent.MatchCount == 0)
             return;
 
         var now = DateTimeOffset.UtcNow;
         var evt = bucketedEvent.Event;
         var providerId = await strings.GetOrCreateIdAsync(evt.Provider, cancellationToken);
 
-        var args = new RedisValue[3 + bucketedEvent.Matches * 2];
+        var args = new RedisValue[3 + bucketedEvent.MatchCount * 2];
         args[0] = providerId;
         args[1] = evt.Timestamp.ToUnixTimeSeconds();
         // args[2] reserved for valid match count.
 
         var validMatches = 0;
-        for (var i = 0; i < bucketedEvent.Matches; i++)
+        for (var i = 0; i < bucketedEvent.MatchCount; i++)
         {
-            var match = bucketedEvent.Buckets[i];
+            var match = bucketedEvent.Matches[i];
 
             var ttlAt = evt.Timestamp + match.Bucket.Ttl;
             if (ttlAt <= now)

@@ -24,10 +24,6 @@ public sealed partial class BucketedEventSink(
             {
                 LogInsertFailed(logger, ex);
             }
-            finally
-            {
-                bucketedEvent.ReturnToPool();
-            }
         }
 
         LogStopped(logger);
