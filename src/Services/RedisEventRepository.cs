@@ -21,27 +21,28 @@ public sealed class RedisEventRepository(
                                         local provider_id = ARGV[1]
                                         local timestamp_sec = tonumber(ARGV[2])
 
-                                        local match_count = tonumber(ARGV[3])
-                                        local stop_idx = 3 + (match_count * 2)
-
                                         local max_ttl = 0
+                                        local bucket_ids = {}
+                                        local bucket_count = 0
 
-                                        for i = 4, stop_idx, 2 do
+                                        for i = 3, #ARGV, 2 do
                                             local bucket_id = tonumber(ARGV[i])
                                             local ttl_ms = tonumber(ARGV[i + 1])
-                                            
-                                            if ttl_ms > max_ttl then 
-                                                max_ttl = ttl_ms 
+
+                                            if ttl_ms > max_ttl then
+                                                max_ttl = ttl_ms
                                             end
+
+                                            bucket_count = bucket_count + 1
+                                            bucket_ids[bucket_count] = bucket_id
                                             
                                             local bucket_key = ip_key .. struct.pack('>i4', bucket_id)
 
                                             local current = redis.call('HGET', bucket_key, provider_id)
-                                            local count = current and struct.unpack('>i4', current) + 1 or 1
+                                            local count = current and math.min(struct.unpack('>I2', current) + 1, 65535) or 1
 
-                                            -- [count: 4B int32][timestamp: 8B int64]
-                                            redis.call('HSET', bucket_key, provider_id, struct.pack('>i4i8', count, timestamp_sec))
-                                            redis.call('SADD', ip_key, bucket_id)
+                                            -- [count: 2B uint16][timestamp: 8B int64]
+                                            redis.call('HSET', bucket_key, provider_id, struct.pack('>I2i8', count, timestamp_sec))
 
                                             -- Set TTL on first write (NX), extend if the new expiry is later (GT).
                                             if redis.call('PEXPIREAT', bucket_key, ttl_ms, 'NX') == 0 then
@@ -49,12 +50,14 @@ public sealed class RedisEventRepository(
                                             end
                                         end
 
+                                        redis.call('SADD', ip_key, unpack(bucket_ids))
+
                                         if redis.call('PEXPIREAT', ip_key, max_ttl, 'NX') == 0 then
                                             redis.call('PEXPIREAT', ip_key, max_ttl, 'GT')
                                         end
                                         """;
 
-    public async Task InsertAsync(BucketedEvent bucketedEvent, CancellationToken cancellationToken)
+    public async ValueTask InsertAsync(BucketedEvent bucketedEvent, CancellationToken cancellationToken)
     {
         if (bucketedEvent.MatchCount == 0)
             return;
@@ -63,23 +66,23 @@ public sealed class RedisEventRepository(
         var evt = bucketedEvent.Event;
         var providerId = await strings.GetOrCreateIdAsync(evt.Provider, cancellationToken);
 
-        var args = new RedisValue[3 + bucketedEvent.MatchCount * 2];
+        var args = new RedisValue[2 + bucketedEvent.MatchCount * 2];
         args[0] = providerId;
         args[1] = evt.Timestamp.ToUnixTimeSeconds();
-        // args[2] reserved for valid match count.
 
         var validMatches = 0;
         for (var i = 0; i < bucketedEvent.MatchCount; i++)
         {
             var match = bucketedEvent.Matches[i];
 
+            // Skip expired matches.
             var ttlAt = evt.Timestamp + match.Bucket.Ttl;
             if (ttlAt <= now)
                 continue;
 
             var bucketId = await strings.GetOrCreateIdAsync(match.Name, cancellationToken);
 
-            var offset = 3 + validMatches * 2;
+            var offset = 2 + validMatches * 2;
             args[offset] = bucketId;
             args[offset + 1] = ttlAt.ToUnixTimeMilliseconds();
             validMatches++;
@@ -88,11 +91,13 @@ public sealed class RedisEventRepository(
         if (validMatches == 0)
             return;
 
-        args[2] = validMatches;
-        
+        // ScriptEvaluateAsync does not like trailing nulls.
+        if (validMatches < bucketedEvent.MatchCount)
+            Array.Resize(ref args, 2 + validMatches * 2);
+
         var ipKey = GetIpKey(evt.IpAddress);
 
-        await _database.ScriptEvaluateAsync(
+        _database.ScriptEvaluate(
             InsertScript,
             keys: [ipKey],
             values: args,
@@ -201,14 +206,16 @@ public sealed class RedisEventRepository(
 
         var bytes = (byte[])entry.Value!;
 
-        const int payloadSize = sizeof(int) + sizeof(long);
+        const int timestampSize = sizeof(long);
+        const int countSize = sizeof(ushort);
+        const int payloadSize = countSize + timestampSize;
 
         if (bytes.Length != payloadSize)
             throw new InvalidDataException($"Expected {payloadSize} bytes, got {bytes.Length}.");
 
-        var count = BinaryPrimitives.ReadInt32BigEndian(bytes);
-
-        var timestamp = BinaryPrimitives.ReadInt64BigEndian(bytes.AsSpan(sizeof(int)));
+        // TODO: Guard against overflow.
+        var count = BinaryPrimitives.ReadUInt16BigEndian(bytes);
+        var timestamp = BinaryPrimitives.ReadInt64BigEndian(bytes.AsSpan(countSize));
         var lastSeen = DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime;
 
         var providerName = await strings.GetStringAsync(providerId, cancellationToken);
