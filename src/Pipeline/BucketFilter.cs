@@ -16,7 +16,7 @@ public sealed class BucketFilter(
 ) : BackgroundService
 {
     private readonly int _bucketsCount = appConfig.Buckets.Count;
-    private readonly TimeSpan _maxBucketTtlMs = appConfig.MaxBucketTtl;
+    private readonly TimeSpan _maxBucketTtl = appConfig.MaxBucketTtl;
     private readonly FrozenDictionary<string, BucketConfig> _buckets = appConfig.Buckets;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,7 +28,7 @@ public sealed class BucketFilter(
             await foreach (var evt in input.ReadAllAsync(stoppingToken))
             {
                 var eventAge = DateTimeOffset.UtcNow - evt.Timestamp;
-                if (eventAge >= _maxBucketTtlMs)
+                if (eventAge >= _maxBucketTtl)
                 {
                     metrics.RecordExpired();
                     continue;
