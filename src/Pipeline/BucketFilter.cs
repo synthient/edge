@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
@@ -39,13 +38,13 @@ public sealed class BucketFilter(
                     ? mmdbReader.Lookup(evt.IpAddress)
                     : null;
 
-                if (!TryMatchBuckets(evt, mmdbData, eventAge, out var matched, out var matchCount))
+                if (!TryMatchBuckets(evt, mmdbData, eventAge, out var matches, out var matchCount))
                 {
                     metrics.RecordUnmatched();
                     continue;
                 }
 
-                var bucketedEvent = new BucketedEvent(evt, matched, matchCount);
+                var bucketedEvent = new BucketedEvent(evt, matches, matchCount);
                 await output.WriteAsync(bucketedEvent, stoppingToken);
             }
         }
@@ -55,15 +54,16 @@ public sealed class BucketFilter(
         }
     }
 
+    // Intentionally not resizing matches array post-matching to avoid extra allocation.
     private bool TryMatchBuckets(
         ProxyEvent evt,
         MmdbData? mmdb,
         TimeSpan eventAge,
-        [NotNullWhen(true)] out BucketMatch[]? matched,
+        [NotNullWhen(true)] out BucketMatch[]? matches,
         out int matchCount
     )
     {
-        var matches = new BucketMatch[_bucketsCount];
+        matches = null;
         matchCount = 0;
 
         foreach (var (name, bucket) in _buckets)
@@ -71,18 +71,13 @@ public sealed class BucketFilter(
             if (eventAge >= bucket.Ttl)
                 continue;
 
-            if (bucket.Matches(evt, mmdb))
-                matches[matchCount++] = new BucketMatch(name, bucket);
+            if (!bucket.Matches(evt, mmdb))
+                continue;
+
+            matches ??= new BucketMatch[_bucketsCount];
+            matches[matchCount++] = new BucketMatch(name, bucket);
         }
 
-        if (matchCount == 0)
-        {
-            matched = null;
-            return false;
-        }
-
-        // Intentionally not resizing matches array to avoid extra allocation.
-        matched = matches;
-        return true;
+        return matchCount > 0;
     }
 }
