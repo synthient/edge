@@ -1,7 +1,7 @@
 # Synthient Edge
 > .NET 10 | ASP.NET Core | Redis
 
-Edge is a lightweight IP context service intended for on-premise deployment by clients with access to the [Synthient firehose](https://docs.synthient.com/enterprise/firehose). See the [wiki](https://github.com/synthient/edge/wiki) for configuration and API reference.
+Edge is a lightweight IP context service intended for self-hosting by clients with access to the [Synthient firehose](https://docs.synthient.com/enterprise/firehose). See the [wiki](https://github.com/synthient/edge/wiki) for configuration and API reference.
 
 ## Pipeline
 
