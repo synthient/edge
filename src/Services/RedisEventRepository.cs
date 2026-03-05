@@ -36,13 +36,13 @@ public sealed class RedisEventRepository(
                                             bucket_count = bucket_count + 1
                                             bucket_ids[bucket_count] = bucket_id
                                             
-                                            local bucket_key = ip_key .. struct.pack('>i4', bucket_id)
+                                            local bucket_key = ip_key .. struct.pack('>I2', bucket_id)
 
                                             local current = redis.call('HGET', bucket_key, provider_id)
                                             local count = current and math.min(struct.unpack('>I2', current) + 1, 65535) or 1
 
-                                            -- [count: 2B uint16][timestamp: 8B int64]
-                                            redis.call('HSET', bucket_key, provider_id, struct.pack('>I2i8', count, timestamp_sec))
+                                            -- [count: 2B uint16][timestamp: 4B uint32]
+                                            redis.call('HSET', bucket_key, provider_id, struct.pack('>I2I4', count, timestamp_sec))
 
                                             -- Set TTL on first write (NX), extend if the new expiry is later (GT).
                                             if redis.call('PEXPIREAT', bucket_key, ttl_ms, 'NX') == 0 then
@@ -205,17 +205,16 @@ public sealed class RedisEventRepository(
             throw new InvalidDataException("Redis hash value is null or empty.");
 
         var bytes = (byte[])entry.Value!;
-
-        const int timestampSize = sizeof(long);
+        
         const int countSize = sizeof(ushort);
+        const int timestampSize = sizeof(uint);
         const int payloadSize = countSize + timestampSize;
 
         if (bytes.Length != payloadSize)
             throw new InvalidDataException($"Expected {payloadSize} bytes, got {bytes.Length}.");
 
-        // TODO: Guard against overflow.
         var count = BinaryPrimitives.ReadUInt16BigEndian(bytes);
-        var timestamp = BinaryPrimitives.ReadInt64BigEndian(bytes.AsSpan(countSize));
+        var timestamp = BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(countSize));
         var lastSeen = DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime;
 
         var providerName = await strings.GetStringAsync(providerId, cancellationToken);
@@ -234,11 +233,13 @@ public sealed class RedisEventRepository(
 
     private static RedisKey GetIpBucketKey(IPAddress ip, int bucketId)
     {
+        const int bucketIdSize = sizeof(ushort);
         var ipSize = ip.AddressFamily == AddressFamily.InterNetwork ? 4 : 16;
-        var key = new byte[ipSize + sizeof(int)];
+
+        var key = new byte[ipSize + bucketIdSize];
 
         ip.TryWriteBytes(key, out _);
-        BinaryPrimitives.WriteInt32BigEndian(key.AsSpan(ipSize), bucketId);
+        BinaryPrimitives.WriteUInt16BigEndian(key.AsSpan(ipSize), (ushort)bucketId);
 
         return key;
     }
