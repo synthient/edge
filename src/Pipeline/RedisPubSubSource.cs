@@ -63,7 +63,7 @@ public sealed partial class RedisPubSubSource(
         await using var connection = await ConnectionMultiplexer.ConnectAsync(_redisOptions);
 
         var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        connection.ConnectionFailed += (_, _) => disconnected.TrySetResult();
+        connection.ConnectionFailed += (_, _) => disconnected.TrySetResult(); // TODO: Log on connection failure?
 
         var subscriber = connection.GetSubscriber();
 

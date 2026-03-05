@@ -17,12 +17,11 @@ public sealed class BucketFilter(
 {
     private readonly int _bucketsCount = appConfig.Buckets.Count;
     private readonly TimeSpan _maxBucketTtl = appConfig.MaxBucketTtl;
+    private readonly bool _requiresMmdb = appConfig.FiltersRequireMmdb;
     private readonly FrozenDictionary<string, BucketConfig> _buckets = appConfig.Buckets;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var requiresMmdb = appConfig.FiltersRequireMmdb;
-
         try
         {
             await foreach (var evt in input.ReadAllAsync(stoppingToken))
@@ -34,7 +33,7 @@ public sealed class BucketFilter(
                     continue;
                 }
 
-                var mmdbData = requiresMmdb
+                var mmdbData = _requiresMmdb
                     ? mmdbReader.Lookup(evt.IpAddress)
                     : null;
 
