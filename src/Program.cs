@@ -14,6 +14,14 @@ var appConfig = AppConfigLoader.Load(args);
 var builder = WebApplication.CreateSlimBuilder(args);
 builder.WebHost.UseUrls($"http://{appConfig.Server.Host}:{appConfig.Server.Port}");
 
+// Logging
+builder.Logging.ClearProviders();
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss.fff] ";
+    options.SingleLine = true;
+});
+
 // Config.
 builder.Services.AddSingleton(appConfig);
 builder.Services.ConfigureHttpJsonOptions(o =>
