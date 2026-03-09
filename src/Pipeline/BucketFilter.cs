@@ -28,10 +28,7 @@ public sealed class BucketFilter(
             {
                 var eventAge = DateTimeOffset.UtcNow - evt.Timestamp;
                 if (eventAge >= _maxBucketTtl)
-                {
-                    metrics.RecordExpired();
                     continue;
-                }
 
                 var mmdbData = _requiresMmdb
                     ? mmdbReader.Lookup(evt.IpAddress)

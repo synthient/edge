@@ -18,7 +18,6 @@ public sealed partial class MetricsReporter(
     private long _processed;
     private long _unmatched;
     private long _overflow;
-    private long _expired;
 
     /// <summary>
     /// Records an event that was received from the source and accepted for processing.
@@ -31,26 +30,22 @@ public sealed partial class MetricsReporter(
     public void RecordProcessed() => Interlocked.Increment(ref _processed);
 
     /// <summary>
-    /// Records an event that was discarded by the filter because it did not match any bucket's filter criteria(s).
+    /// Records an event that was discarded because it did not match any bucket's filter(s).
     /// </summary>
     public void RecordUnmatched() => Interlocked.Increment(ref _unmatched);
 
     /// <summary>
-    /// Records an event that was lost at ingestion because the filter channel was full, indicating that the system is under backpressure and cannot keep up with the incoming event rate.
+    /// Records an event that was lost at ingestion because the filter channel was full.
     /// </summary>
     public void RecordOverflow() => Interlocked.Increment(ref _overflow);
 
-    /// <summary>
-    /// Records an event that was discarded by the filter because it was older than any bucket TTL.
-    /// </summary>
-    public void RecordExpired() => Interlocked.Increment(ref _expired);
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        if (!logger.IsEnabled(LogLevel.Information)) return;
+        if (!logger.IsEnabled(LogLevel.Information))
+            return;
 
         using var timer = new PeriodicTimer(LogInterval);
-        long lastIngested = 0, lastProcessed = 0, lastUnmatched = 0, lastOverflow = 0, lastExpired = 0;
+        long lastIngested = 0, lastProcessed = 0, lastUnmatched = 0, lastOverflow = 0;
 
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
@@ -58,54 +53,41 @@ public sealed partial class MetricsReporter(
             var processed = Volatile.Read(ref _processed);
             var unmatched = Volatile.Read(ref _unmatched);
             var overflow = Volatile.Read(ref _overflow);
-            var expired = Volatile.Read(ref _expired);
             var seconds = LogInterval.TotalSeconds;
 
             var ingestedDelta = ingested - lastIngested;
             var processedDelta = processed - lastProcessed;
             var unmatchedDelta = unmatched - lastUnmatched;
             var overflowDelta = overflow - lastOverflow;
-            var expiredDelta = expired - lastExpired;
-            var unmatchedPerc = ingestedDelta > 0 ? (double)unmatchedDelta / ingestedDelta * 100 : 0;
+            var unmatchedPct = ingestedDelta > 0 ? unmatchedDelta * 100.0 / ingestedDelta : 0;
+            var lag = filterQueue.Count + sinkQueue.Count;
 
             LogThroughput(
                 logger,
                 ingestedRate: ingestedDelta / seconds,
                 processedRate: processedDelta / seconds,
-                ingestedDelta,
-                processedDelta,
-                unmatched: unmatchedDelta,
-                unmatchedPerc,
+                unmatchedPct: unmatchedPct,
                 overflow: overflowDelta,
-                expired: expiredDelta,
-                filterQueueCount: filterQueue.Count,
-                sinkQueueCount: sinkQueue.Count
+                lag: lag
             );
 
-            (lastIngested, lastProcessed, lastUnmatched, lastOverflow, lastExpired) =
-                (ingested, processed, unmatched, overflow, expired);
+            (lastIngested, lastProcessed, lastUnmatched, lastOverflow) = (ingested, processed, unmatched, overflow);
         }
     }
 
     [LoggerMessage(LogLevel.Information,
-        "Ingested: {ingestedRate:N0}/s (+{ingestedDelta:N0}) | " +
-        "Processed: {processedRate:N0}/s (+{processedDelta:N0}) | " +
-        "Unmatched: {unmatched:N0} ({unmatchedPct:N1}%) | " +
+        "Ingested: {ingestedRate:N0}/s | " +
+        "Processed: {processedRate:N0}/s | " +
+        "Unmatched: {unmatchedPct:N1}% | " +
         "Overflow: {overflow:N0} | " +
-        "Expired: {expired:N0} | " +
-        "ToFilter: {filterQueueCount:N0} | ToSink: {sinkQueueCount:N0}"
+        "Lag: {lag:N0}"
     )]
     private static partial void LogThroughput(
         ILogger logger,
         double ingestedRate,
         double processedRate,
-        long ingestedDelta,
-        long processedDelta,
-        long unmatched,
         double unmatchedPct,
         long overflow,
-        long expired,
-        int filterQueueCount,
-        int sinkQueueCount
+        int lag
     );
 }
