@@ -98,6 +98,6 @@ public sealed partial class RedisStringRegistry(
         LogWarmed(logger, strings.Length);
     }
 
-    [LoggerMessage(LogLevel.Information, "String registry cache warmed with {count} entries")]
+    [LoggerMessage(LogLevel.Information, "String registry warmed with {count} entries")]
     private static partial void LogWarmed(ILogger<RedisStringRegistry> logger, int count);
 }

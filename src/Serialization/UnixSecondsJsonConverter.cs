@@ -1,4 +1,5 @@
 ﻿using System.Buffers.Text;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -18,7 +19,7 @@ public class UnixSecondsJsonConverter : JsonConverter<DateTimeOffset>
 
         if (!Utf8Parser.TryParse(span, out seconds, out var bytesConsumed) || bytesConsumed != span.Length)
         {
-            var stringValue = System.Text.Encoding.UTF8.GetString(span);
+            var stringValue = Encoding.UTF8.GetString(span);
             throw new JsonException($"Invalid Unix timestamp (seconds): '{stringValue}'.");
         }
 
