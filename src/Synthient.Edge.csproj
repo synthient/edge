@@ -6,12 +6,17 @@
         <ImplicitUsings>enable</ImplicitUsings>
         
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <RuntimeIdentifiers>linux-x64;linux-arm64;win-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+        <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+        <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
     </PropertyGroup>
 
     <PropertyGroup>
         <Version>0.1.0</Version>
         <Authors>Synthient LLC</Authors>
         <Company>Synthient LLC</Company>
+        <Copyright>Copyright © Synthient LLC</Copyright>
+        <PackageLicenseExpression>BUSL-1.1</PackageLicenseExpression>
     </PropertyGroup>
 
     <ItemGroup>
