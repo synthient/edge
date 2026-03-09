@@ -29,6 +29,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer
     DefaultDatabase = appConfig.Sink.Database,
     AbortOnConnectFail = false,
     ConnectRetry = 5,
+    IncludeDetailInExceptions = builder.Environment.IsDevelopment(),
     ConnectTimeout = 5_000,
     SyncTimeout = 5_000,
 }));

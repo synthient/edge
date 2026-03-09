@@ -11,6 +11,7 @@ public sealed partial class RedisPubSubSource(
     AppConfig appConfig,
     ChannelWriter<ProxyEvent> output,
     MetricsReporter metrics,
+    IHostEnvironment env,
     ILogger<RedisPubSubSource> logger
 ) : BackgroundService
 {
@@ -18,7 +19,7 @@ public sealed partial class RedisPubSubSource(
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromSeconds(30);
 
     private readonly RedisChannel _channel = RedisChannel.Literal(appConfig.Source.Channel);
-    private readonly ConfigurationOptions _redisOptions = BuildRedisConfiguration(appConfig.Source);
+    private readonly ConfigurationOptions _redisOptions = BuildRedisConfiguration(appConfig.Source, env.IsDevelopment());
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -90,14 +91,15 @@ public sealed partial class RedisPubSubSource(
             metrics.RecordOverflow();
     }
 
-    private static ConfigurationOptions BuildRedisConfiguration(RedisSourceConfig config) => new()
+    private static ConfigurationOptions BuildRedisConfiguration(RedisSourceConfig config, bool isDevelopment) => new()
     {
         EndPoints = { config.Endpoint },
         Password = config.Password,
         Ssl = config.Ssl,
         AbortOnConnectFail = false,
         ReconnectRetryPolicy = new ExponentialRetry(deltaBackOffMilliseconds: 1000),
-        ConnectRetry = 5
+        ConnectRetry = 5,
+        IncludeDetailInExceptions = isDevelopment
     };
 
     [LoggerMessage(LogLevel.Error, "Redis connection failed. Reconnecting in {backoff:g}.")]
